@@ -17,7 +17,11 @@ from ..scanner.market_scanner import MarketScanner
 
 
 # ============ CONSTANTS ============
-ADMIN_PASSWORD = "crypto_admin_2024"  # Change this in production!
+# ADMIN_PASSWORD is now loaded from .env
+
+# Trial period
+TRIAL_DAYS = 3
+FREE_LIMIT_COINS = 5  # Limit for free users per day
 
 # Popular tokens for quick selection
 POPULAR_TOKENS = [
@@ -93,18 +97,23 @@ class ButtonBot:
     No text input from users (except admin password)
     """
     
-    def __init__(self, token: str, admin_ids: list = None):
+    def __init__(self, token: str, admin_ids: list = None, admin_password: str = "crypto_admin_2024"):
         self.token = token
         self.admin_ids = admin_ids or []
+        self.admin_password = admin_password  # Password from .env
         
         self.db = DatabaseManager()
         self.monitor: Optional[BackgroundMonitor] = None
-        self.scanner = MarketScanner()  # Автоматический поиск монет
+        self.scanner = MarketScanner()
         
         # Track user states
-        self.user_states: Dict[int, str] = {}  # user_id -> current_state
-        self.admin_attempts: Dict[int, int] = {}  # user_id -> failed_attempts
-        self.temp_data: Dict[int, dict] = {}  # Temporary data storage
+        self.user_states: Dict[int, str] = {}
+        self.admin_attempts: Dict[int, int] = {}
+        self.temp_data: Dict[int, dict] = {}
+        
+        # User daily limits (for free trial)
+        self.user_requests: Dict[int, int] = {}  # user_id -> requests_today
+        self.last_request_date: Dict[int, str] = {}  # user_id -> date string
     
     async def initialize(self):
         """Initialize bot components"""
@@ -142,21 +151,79 @@ class ButtonBot:
     # ============ COMMAND HANDLERS ============
     
     async def cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /start command - show main menu"""
+        """Handle /start command - show welcome and main menu"""
         user_id = update.effective_user.id
+        first_name = update.effective_user.first_name or "Друг"
         
-        # Auto-register user
-        await self.db.create_user(
+        # Auto-register user with trial period
+        user = await self.db.create_user(
             user_id=user_id,
             username=update.effective_user.username,
             first_name=update.effective_user.first_name,
             last_name=update.effective_user.last_name
         )
         
+        # Set trial period if new user
+        if user and not user.subscription_expires and not user.is_premium:
+            from datetime import timedelta
+            trial_end = datetime.utcnow() + timedelta(days=TRIAL_DAYS)
+            await self.db.update_user(user_id, subscription_expires=trial_end)
+        
         self.user_states[user_id] = Actions.MENU_MAIN
         
+        # Get user's subscription status
+        user = await self.db.get_user(user_id)
+        is_trial = user and user.subscription_expires and not user.is_premium
+        
+        if is_trial:
+            days_left = (user.subscription_expires - datetime.utcnow()).days
+            trial_text = f"""
+🎁 *Бесплатный пробный период*
+
+⏰ Осталось дней: *{max(0, days_left)}*
+📊 Лимит запросов: {FREE_LIMIT_COINS} монет/день
+
+💡 После окончания пробного периода:
+• Подписка активируется автоматически
+• Мы напомним вам о продлении
+"""
+        else:
+            trial_text = """
+🎁 *Ваша подписка активна!*
+
+✅ Бесплатные функции доступны
+💎 Полный доступ к аналитике
+"""
+        
+        welcome_text = f"""👋 *Привет, {first_name}!*
+
+🐋 Я — *Crypto Intelligence Bot*
+Твой персональный AI-аналитик криптовалют
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🤖 *Что я умею:*
+
+📊 *АВТОМАТИЧЕСКИ нахожу лучшие монеты*
+   Сканирую рынок каждые 15 минут
+   Анализирую объемы, тренды, китов
+
+🟢🟡🔴 *Сигналы на покупку/продажу*
+   BUY — покупать
+   HOLD — держать
+   SELL — продавать
+
+🔔 *Уведомления в реальном времени*
+   При сигнале — присылаю оповещение
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+{trial_text}
+
+👇 *Выберите действие:*"""
+        
         await update.message.reply_text(
-            self._get_main_menu_text(),
+            welcome_text,
             parse_mode="Markdown",
             reply_markup=self._get_main_menu_keyboard()
         )
@@ -293,7 +360,7 @@ class ButtonBot:
         # Check if user is entering admin password
         if self.user_states.get(user_id) == Actions.ADMIN_ENTER:
             if user_id in self.admin_ids:
-                if text == ADMIN_PASSWORD:
+                if text == self.admin_password:
                     await update.message.reply_text(
                         "✅ *Пароль верный!*\n\nДобро пожаловать в админ-панель!",
                         parse_mode="Markdown",

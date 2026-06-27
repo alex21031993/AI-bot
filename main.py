@@ -44,6 +44,7 @@ def load_config():
     
     telegram_token = os.getenv("TELEGRAM_BOT_TOKEN")
     admin_ids = os.getenv("ADMIN_USER_IDS", "")
+    admin_password = os.getenv("ADMIN_PASSWORD", "crypto_admin_2024")  # Default for backwards compatibility
     
     admin_list = []
     if admin_ids:
@@ -54,7 +55,8 @@ def load_config():
     
     return {
         "telegram_token": telegram_token,
-        "admin_ids": admin_list
+        "admin_ids": admin_list,
+        "admin_password": admin_password
     }
 
 
@@ -102,7 +104,8 @@ async def main():
     # Create button-only bot
     bot = ButtonBot(
         token=config["telegram_token"],
-        admin_ids=config["admin_ids"]
+        admin_ids=config["admin_ids"],
+        admin_password=config["admin_password"]
     )
     
     await bot.initialize()
