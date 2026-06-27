@@ -283,7 +283,11 @@ class ButtonBot:
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Handle all button presses"""
         query = update.callback_query
-        await query.answer()
+        try:
+            await query.answer()
+        except Exception:
+            # Ignore old callback queries
+            pass
         
         user_id = query.from_user.id
         data = query.data
