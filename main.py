@@ -1,12 +1,12 @@
 """
 Crypto Intelligence Agent - Main Entry Point
 
-A comprehensive cryptocurrency analysis bot that analyzes:
-- Social media presence and trends
-- Market sentiment
-- Whale activity
-- Technical indicators
-- Trading volume and liquidity
+A comprehensive cryptocurrency analysis bot with:
+- User authorization and tracking
+- Automatic BUY/SELL/HOLD signals
+- 24/7 background monitoring
+- Price alerts
+- Trading recommendations
 """
 import asyncio
 import os
@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from dotenv import load_dotenv
 from loguru import logger
 
-from crypto_intelligence_agent.telegram.bot import CryptoIntelligenceBot, BotConfig
+from crypto_intelligence_agent.telegram.advanced_bot import CryptoBot
 from crypto_intelligence_agent.agents.crypto_agent import CryptoIntelligenceAgent
 
 
@@ -73,7 +73,6 @@ async def test_agent():
     
     agent = CryptoIntelligenceAgent()
     
-    # Test tokens
     test_tokens = ["BTC", "ETH", "SOL"]
     
     for token in test_tokens:
@@ -82,14 +81,21 @@ async def test_agent():
         result = await agent.execute(token=token)
         
         if result.success:
-            logger.info(f"✅ {token} Analysis Complete")
-            logger.info(f"   Total Score: {result.data.get('scores', {}).get('total', 0):.1f}%")
-            logger.info(f"   Risk Level: {result.data.get('risk', {}).get('level', 'N/A')}")
+            rec = result.data.get('recommendation', {})
+            scores = result.data.get('scores', {})
+            
+            emoji = {'BUY': '🟢', 'SELL': '🔴', 'HOLD': '🟡', 'WAIT': '⚪'}
+            e = emoji.get(rec.get('action', '?'), '?')
+            
+            logger.info(f"✅ {token} {e} {rec.get('action', '?')}")
+            logger.info(f"   Score: {scores.get('total', 0):.1f}% | Confidence: {rec.get('confidence', 0):.0f}%")
             logger.info(f"   Price: ${result.data.get('price', 'N/A')}")
+            
+            for r in rec.get('rationale', [])[:2]:
+                logger.info(f"   → {r}")
         else:
             logger.error(f"❌ {token} Analysis Failed: {result.error}")
     
-    # Clean up
     for analyzer in agent.analyzers.values():
         if hasattr(analyzer, 'close'):
             await analyzer.close()
@@ -101,6 +107,7 @@ async def main():
     """Main entry point"""
     setup_logging()
     logger.info("🚀 Starting Crypto Intelligence Agent")
+    logger.info("🐋 With 24/7 Auto-Signals & Monitoring")
     
     # Load configuration
     config = load_config()
@@ -111,26 +118,31 @@ async def main():
         await test_agent()
         return
     
-    # Create bot configuration
-    bot_config = BotConfig(
+    # Create and initialize bot
+    bot = CryptoBot(
         token=config["telegram_token"],
-        admin_ids=config["admin_ids"],
-        demo_mode=config["demo_mode"]
+        admin_ids=config["admin_ids"]
     )
     
-    # Create and run bot
-    bot = CryptoIntelligenceBot(bot_config)
+    # Initialize database and monitor
+    await bot.initialize()
     
-    logger.info("✅ Crypto Intelligence Bot initialized")
-    logger.info("📱 Starting Telegram bot...")
+    logger.info("✅ Database initialized")
+    logger.info("✅ Background monitor ready")
+    logger.info("📱 Starting Telegram bot with auto-signals...")
+    
+    # Start monitoring in background
+    asyncio.create_task(bot.start_monitoring())
     
     try:
-        bot.run()
+        # Create and run app
+        app = bot.create_app()
+        app.run_polling()
     except KeyboardInterrupt:
         logger.info("Bot stopped by user")
-    except Exception as e:
-        logger.error(f"Bot error: {e}")
-        raise
+    finally:
+        await bot.stop_monitoring()
+        await bot.db.close()
 
 
 if __name__ == "__main__":
