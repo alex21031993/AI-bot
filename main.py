@@ -2,8 +2,6 @@
 Crypto Intelligence Agent - Main Entry Point
 
 100% Button-Only Telegram Bot
-All interaction through buttons ONLY
-Admin password only allowed text input
 """
 import asyncio
 import os
@@ -12,13 +10,6 @@ from pathlib import Path
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
-
-# Fix for Python 3.13+ event loop issue
-try:
-    import nest_asyncio
-    nest_asyncio.apply()
-except ImportError:
-    pass
 
 from dotenv import load_dotenv
 from loguru import logger
@@ -95,44 +86,76 @@ async def test_agent():
     logger.info("✅ Tests completed!")
 
 
-def main():
-    """Main entry point"""
-    setup_logging()
-    logger.info("🚀 Starting Crypto Intelligence Bot")
-    logger.info("📱 100% Button-Only Interface")
-
+async def run_bot_async():
+    """Run bot asynchronously"""
     config = load_config()
 
     if not config["telegram_token"]:
         logger.warning("No Telegram token. Running test mode...")
-        asyncio.run(test_agent())
+        await test_agent()
         return
 
-    # Create button-only bot
     bot = ButtonBot(
         token=config["telegram_token"],
         admin_ids=config["admin_ids"],
         admin_password=config["admin_password"]
     )
 
-    async def run_bot():
-        await bot.initialize()
-        logger.info("✅ Database initialized")
-        logger.info("✅ Background monitor ready")
-        logger.info("📱 Starting button-only bot...")
+    await bot.initialize()
+    logger.info("✅ Database initialized")
+    logger.info("✅ Background monitor ready")
+    logger.info("📱 Starting button-only bot...")
+    
+    asyncio.create_task(bot.start_monitoring())
+    
+    app = bot.create_app()
+    
+    async def start():
+        await app.initialize()
+        await app.start()
+        await app.updater.start_polling(allowed_updates=["callback_query", "message"])
         
-        asyncio.create_task(bot.start_monitoring())
-        
-        try:
-            app = bot.create_app()
-            app.run_polling(allowed_updates=["callback_query", "message"])
-        except KeyboardInterrupt:
-            logger.info("Bot stopped")
-        finally:
-            await bot.stop_monitoring()
-            await bot.db.close()
+        # Keep running
+        while True:
+            await asyncio.sleep(3600)
+    
+    try:
+        await start()
+    except (KeyboardInterrupt, asyncio.CancelledError):
+        logger.info("Bot stopped")
+    finally:
+        await bot.stop_monitoring()
+        await app.stop()
+        await bot.db.close()
 
-    asyncio.run(run_bot())
+
+def main():
+    """Main entry point"""
+    setup_logging()
+    logger.info("🚀 Starting Crypto Intelligence Bot")
+    logger.info("📱 100% Button-Only Interface")
+
+    # Fix for Python 3.13+ event loop
+    try:
+        import nest_asyncio
+        nest_asyncio.apply()
+    except ImportError:
+        pass
+
+    # Run
+    try:
+        asyncio.run(run_bot_async())
+    except RuntimeError as e:
+        if "event loop" in str(e).lower():
+            # Fallback: create new event loop
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                loop.run_until_complete(run_bot_async())
+            finally:
+                loop.close()
+        else:
+            raise
 
 
 if __name__ == "__main__":
