@@ -494,7 +494,32 @@ class ButtonBot:
 ━━━━━━━━━━━━━━━
 👇 Выберите действие:"""
 
-    def _get_main_menu_keyboard(self) -> InlineKeyboardMarkup:
+    def _get_main_menu_keyboard(self, user_trial_active: bool = True, is_admin: bool = False) -> InlineKeyboardMarkup:
+        """
+        Get main menu keyboard
+        - If trial active or admin: show all buttons
+        - If trial expired: show only subscription button
+        """
+        # Admin has full access
+        if is_admin:
+            return InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔍 НАЙТИ МОНЕТЫ", callback_data=Actions.SCAN_BUY_SIGNALS)],
+                [InlineKeyboardButton("📊 ТОП-10", callback_data=Actions.SCAN_TOP_10)],
+                [InlineKeyboardButton("📈 СИГНАЛЫ", callback_data=Actions.SCAN_SIGNALS)],
+                [InlineKeyboardButton("🔄 ОБНОВИТЬ", callback_data=Actions.SCAN_REFRESH)],
+                [InlineKeyboardButton("💎 PREMIUM СИГНАЛ", callback_data=Actions.PREMIUM_SIGNAL)],
+                [InlineKeyboardButton("🔔 Оповещения", callback_data=Actions.MENU_ALERTS)],
+                [InlineKeyboardButton("👑 АДМИН-ПАНЕЛЬ", callback_data=Actions.ADMIN_PANEL)],
+                [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
+            ])
+        
+        # If trial expired - show only subscription
+        if not user_trial_active:
+            return InlineKeyboardMarkup([
+                [InlineKeyboardButton("💳 КУПИТЬ ПОДПИСКУ", callback_data=Actions.MENU_SUBSCRIBE)]
+            ])
+        
+        # Trial active - show all buttons
         return InlineKeyboardMarkup([
             [InlineKeyboardButton("🔍 НАЙТИ МОНЕТЫ", callback_data=Actions.SCAN_BUY_SIGNALS)],
             [InlineKeyboardButton("📊 ТОП-10", callback_data=Actions.SCAN_TOP_10)],
@@ -507,11 +532,50 @@ class ButtonBot:
         ])
     
     async def _show_main_menu(self, query):
-        """Show main menu"""
+        """Show main menu with trial check"""
+        user_id = query.from_user.id
+        
+        # Check if trial is active for non-admin users
+        user_trial_active = True
+        is_admin = user_id in self.admin_ids
+        
+        if not is_admin:
+            user = await self.db.get_user(user_id)
+            if user and user.created_at:
+                from datetime import timedelta
+                trial_end = user.created_at + timedelta(days=3)
+                user_trial_active = datetime.utcnow() < trial_end
+        
+        # If trial expired - show subscription only
+        if not is_admin and not user_trial_active:
+            text = """🐋 *Crypto Intelligence Bot*
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+⏰ *Ваш бесплатный период истёк!*
+
+📅 Пробный период: 3 дня
+
+💎 *Подписка открывает:*
+• Все функции без ограничений
+• Premium анализ монеты дня
+• Сигналы 24/7
+• Уведомления о пампах/дампах
+
+👇 *Выберите план подписки:*
+"""
+            await query.edit_message_text(
+                text,
+                parse_mode="Markdown",
+                reply_markup=self._get_main_menu_keyboard(user_trial_active=False, is_admin=False)
+            )
+            return
+        
+        # Show full menu
         await query.edit_message_text(
             self._get_main_menu_text(),
             parse_mode="Markdown",
-            reply_markup=self._get_main_menu_keyboard()
+            reply_markup=self._get_main_menu_keyboard(user_trial_active=True, is_admin=is_admin)
         )
     
     # ============ SCANNER METHODS ============
@@ -746,12 +810,22 @@ class ButtonBot:
         )
         
         try:
-            # Проверяем подписку
+            # Проверяем подписку или админ
             user = await self.db.get_user(user_id)
-            is_premium = user and (user.is_premium or 
-                (user.subscription_expires and user.subscription_expires > datetime.utcnow()))
+            is_premium = (
+                user_id in self.admin_ids or  # Admin has full access
+                (user and user.is_premium) or
+                (user and user.subscription_expires and user.subscription_expires > datetime.utcnow())
+            )
             
-            if not is_premium:
+            # Проверяем trial период (3 дня)
+            user_trial_active = True
+            if user and user.created_at:
+                from datetime import timedelta
+                trial_end = user.created_at + timedelta(days=3)
+                user_trial_active = datetime.utcnow() < trial_end
+            
+            if not is_premium and not user_trial_active and user_id not in self.admin_ids:
                 # Показываем превью обычного анализа
                 coins = await self.scanner.scan_market(50)
                 if coins:
