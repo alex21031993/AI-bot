@@ -1,0 +1,889 @@
+"""
+Crypto Intelligence Bot - 100% Button-Only Interface
+
+All user interaction is through buttons ONLY.
+Text input is only allowed for admin password.
+"""
+import asyncio
+from datetime import datetime
+from typing import Dict, Optional
+
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, ContextTypes, filters
+
+from ..database.manager import DatabaseManager
+from ..monitoring.monitor import BackgroundMonitor
+
+
+# ============ CONSTANTS ============
+ADMIN_PASSWORD = "crypto_admin_2024"  # Change this in production!
+
+# Popular tokens for quick selection
+POPULAR_TOKENS = [
+    ["BTC", "ETH", "SOL", "BNB"],
+    ["XRP", "ADA", "DOGE", "AVAX"],
+    ["DOT", "LINK", "MATIC", "SHIB"]
+]
+
+# Menu action constants
+class Actions:
+    # Main menu
+    MENU_MAIN = "menu_main"
+    MENU_BACK = "menu_back"
+    
+    # Analysis menu
+    MENU_ANALYSIS = "menu_analysis"
+    SELECT_TOKEN = "select_token"
+    ANALYSIS_RESULT = "analysis_result"
+    
+    # Watchlist menu  
+    MENU_WATCHLIST = "menu_watchlist"
+    WATCHLIST_SHOW = "watchlist_show"
+    WATCHLIST_ADD = "watchlist_add"
+    WATCHLIST_REMOVE = "watchlist_remove"
+    
+    # Signals menu
+    MENU_SIGNALS = "menu_signals"
+    SIGNALS_ACTIVE = "signals_active"
+    
+    # Alerts menu
+    MENU_ALERTS = "menu_alerts"
+    ALERTS_SHOW = "alerts_show"
+    ALERTS_ADD = "alerts_add"
+    ALERTS_ABOVE = "alerts_above"
+    ALERTS_BELOW = "alerts_below"
+    
+    # Subscribe menu
+    MENU_SUBSCRIBE = "menu_subscribe"
+    SUB_TRIAL = "sub_trial"
+    SUB_STANDARD = "sub_standard"
+    SUB_PREMIUM = "sub_premium"
+    
+    # Settings menu
+    MENU_SETTINGS = "menu_settings"
+    SETTINGS_NOTIFY_SIGNALS = "settings_sig"
+    SETTINGS_NOTIFY_WHALE = "settings_whale"
+    SETTINGS_NOTIFY_PRICE = "settings_price"
+    
+    # Admin menu
+    ADMIN_ENTER = "admin_enter"
+    ADMIN_MENU = "admin_menu"
+    ADMIN_STATS = "admin_stats"
+    ADMIN_BROADCAST = "admin_broadcast"
+    ADMIN_USERS = "admin_users"
+    
+    # Token selection prefixes
+    TOKEN_SELECT = "tok_"
+    TOKEN_REMOVE = "rem_"
+    TOKEN_ALERT_ABOVE = "alab_"
+    TOKEN_ALERT_BELOW = "albe_"
+
+
+class ButtonBot:
+    """
+    100% Button-only Telegram bot
+    No text input from users (except admin password)
+    """
+    
+    def __init__(self, token: str, admin_ids: list = None):
+        self.token = token
+        self.admin_ids = admin_ids or []
+        
+        self.db = DatabaseManager()
+        self.monitor: Optional[BackgroundMonitor] = None
+        
+        # Track user states
+        self.user_states: Dict[int, str] = {}  # user_id -> current_state
+        self.admin_attempts: Dict[int, int] = {}  # user_id -> failed_attempts
+        self.temp_data: Dict[int, dict] = {}  # Temporary data storage
+    
+    async def initialize(self):
+        """Initialize bot components"""
+        await self.db.initialize()
+        
+        self.monitor = BackgroundMonitor(
+            db=self.db,
+            alert_callback=self._send_alert
+        )
+    
+    async def _send_alert(self, user_id: int, message: str):
+        """Send alert to user"""
+        try:
+            if hasattr(self, 'app') and self.app:
+                await self.app.bot.send_message(chat_id=user_id, text=message, parse_mode="Markdown")
+        except Exception as e:
+            print(f"Error sending alert: {e}")
+    
+    def create_app(self) -> Application:
+        """Create and configure the Telegram application"""
+        self.app = Application.builder().token(self.token).build()
+        
+        # Only allow callback queries and specific commands
+        self.app.add_handler(CallbackQueryHandler(self.handle_callback))
+        self.app.add_handler(CommandHandler("start", self.cmd_start))
+        
+        # Only allow text for admin password
+        self.app.add_handler(MessageHandler(
+            filters.TEXT & ~filters.COMMAND,
+            self.handle_text_input
+        ))
+        
+        return self.app
+    
+    # ============ COMMAND HANDLERS ============
+    
+    async def cmd_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle /start command - show main menu"""
+        user_id = update.effective_user.id
+        
+        # Auto-register user
+        await self.db.create_user(
+            user_id=user_id,
+            username=update.effective_user.username,
+            first_name=update.effective_user.first_name,
+            last_name=update.effective_user.last_name
+        )
+        
+        self.user_states[user_id] = Actions.MENU_MAIN
+        
+        await update.message.reply_text(
+            self._get_main_menu_text(),
+            parse_mode="Markdown",
+            reply_markup=self._get_main_menu_keyboard()
+        )
+    
+    # ============ CALLBACK HANDLER ============
+    
+    async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle all button presses"""
+        query = update.callback_query
+        await query.answer()
+        
+        user_id = query.from_user.id
+        data = query.data
+        
+        # Handle based on current state and action
+        if data == Actions.MENU_MAIN or data == Actions.MENU_BACK:
+            await self._show_main_menu(query)
+        
+        elif data == Actions.MENU_ANALYSIS:
+            await self._show_analysis_menu(query)
+        
+        elif data == Actions.SELECT_TOKEN:
+            await self._show_token_selection(query, "analysis")
+        
+        elif data.startswith(Actions.TOKEN_SELECT):
+            token = data.replace(Actions.TOKEN_SELECT, "")
+            await self._analyze_token(query, token)
+        
+        elif data == Actions.MENU_WATCHLIST:
+            await self._show_watchlist_menu(query)
+        
+        elif data == Actions.WATCHLIST_ADD:
+            await self._show_token_selection(query, "watchlist_add")
+        
+        elif data.startswith(Actions.TOKEN_SELECT + "watchlist_add_"):
+            token = data.replace(Actions.TOKEN_SELECT + "watchlist_add_", "")
+            await self._add_to_watchlist(query, token)
+        
+        elif data == Actions.WATCHLIST_REMOVE:
+            await self._show_watchlist_remove(query)
+        
+        elif data.startswith(Actions.TOKEN_REMOVE):
+            token = data.replace(Actions.TOKEN_REMOVE, "")
+            await self._remove_from_watchlist(query, token)
+        
+        elif data == Actions.WATCHLIST_SHOW:
+            await self._show_watchlist(query)
+        
+        elif data == Actions.MENU_SIGNALS:
+            await self._show_signals_menu(query)
+        
+        elif data == Actions.SIGNALS_ACTIVE:
+            await self._show_active_signals(query)
+        
+        elif data == Actions.MENU_ALERTS:
+            await self._show_alerts_menu(query)
+        
+        elif data == Actions.ALERTS_ADD:
+            await self._show_alerts_type_selection(query)
+        
+        elif data == Actions.ALERTS_ABOVE:
+            await self._show_token_selection(query, "alert_above")
+        
+        elif data == Actions.ALERTS_BELOW:
+            await self._show_token_selection(query, "alert_below")
+        
+        elif data.startswith(Actions.TOKEN_ALERT_ABOVE):
+            token = data.replace(Actions.TOKEN_ALERT_ABOVE, "")
+            await self._set_price_alert(query, token, "above")
+        
+        elif data.startswith(Actions.TOKEN_ALERT_BELOW):
+            token = data.replace(Actions.TOKEN_ALERT_BELOW, "")
+            await self._set_price_alert(query, token, "below")
+        
+        elif data == Actions.ALERTS_SHOW:
+            await self._show_user_alerts(query)
+        
+        elif data == Actions.MENU_SUBSCRIBE:
+            await self._show_subscribe_menu(query)
+        
+        elif data in [Actions.SUB_TRIAL, Actions.SUB_STANDARD, Actions.SUB_PREMIUM]:
+            await self._show_subscription_details(query, data)
+        
+        elif data == Actions.MENU_SETTINGS:
+            await self._show_settings_menu(query)
+        
+        elif data.startswith(Actions.SETTINGS_NOTIFY_SIGNALS):
+            await self._toggle_setting(query, "signal")
+        
+        elif data.startswith(Actions.SETTINGS_NOTIFY_WHALE):
+            await self._toggle_setting(query, "whale")
+        
+        elif data.startswith(Actions.SETTINGS_NOTIFY_PRICE):
+            await self._toggle_setting(query, "price")
+        
+        elif data == Actions.ADMIN_ENTER:
+            await self._request_admin_password(query)
+        
+        elif data == Actions.ADMIN_MENU:
+            await self._show_admin_menu(query)
+        
+        elif data == Actions.ADMIN_STATS:
+            await self._show_admin_stats(query)
+        
+        elif data == Actions.ADMIN_BROADCAST:
+            await self._request_broadcast_message(query)
+        
+        elif data == Actions.ADMIN_USERS:
+            await self._show_admin_users(query)
+    
+    # ============ TEXT INPUT HANDLER ============
+    
+    async def handle_text_input(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Handle text input - only admin password allowed"""
+        user_id = update.effective_user.id
+        text = update.message.text.strip()
+        
+        # Check if user is entering admin password
+        if self.user_states.get(user_id) == Actions.ADMIN_ENTER:
+            if user_id in self.admin_ids:
+                if text == ADMIN_PASSWORD:
+                    await update.message.reply_text(
+                        "✅ *Пароль верный!*\n\nДобро пожаловать в админ-панель!",
+                        parse_mode="Markdown",
+                        reply_markup=self._get_admin_keyboard()
+                    )
+                    self.user_states[user_id] = Actions.ADMIN_MENU
+                else:
+                    attempts = self.admin_attempts.get(user_id, 0) + 1
+                    self.admin_attempts[user_id] = attempts
+                    
+                    if attempts >= 3:
+                        await update.message.reply_text("❌ Слишком много попыток. Попробуйте позже.")
+                        self.user_states[user_id] = Actions.MENU_MAIN
+                    else:
+                        await update.message.reply_text(
+                            f"❌ Неверный пароль. Осталось попыток: {3 - attempts}",
+                            reply_markup=InlineKeyboardMarkup([[
+                                InlineKeyboardButton("🔙 Отмена", callback_data=Actions.MENU_MAIN)
+                            ]])
+                        )
+            return
+        
+        # Check if user is entering broadcast message
+        if self.user_states.get(user_id) == "broadcast_input" and user_id in self.admin_ids:
+            self.temp_data[user_id] = {"broadcast_msg": text}
+            await update.message.reply_text(
+                f"📢 *Подтвердите рассылку:*\n\n{text}",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup([
+                    [InlineKeyboardButton("✅ Отправить", callback_data="confirm_broadcast")],
+                    [InlineKeyboardButton("❌ Отмена", callback_data=Actions.ADMIN_MENU)]
+                ])
+            )
+            self.user_states[user_id] = Actions.ADMIN_MENU
+            return
+        
+        # Check if user is entering alert price
+        if self.user_states.get(user_id, "").startswith("alert_price_"):
+            parts = self.user_states[user_id].split("_")
+            token = parts[2]
+            direction = parts[3]
+            
+            try:
+                price = float(text.replace(",", "").replace("$", ""))
+                await self._create_price_alert(update.message, token, direction, price)
+            except ValueError:
+                await update.message.reply_text(
+                    "❌ Неверный формат цены. Введите число.",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🔙 Отмена", callback_data=Actions.MENU_ALERTS)
+                    ]])
+                )
+            self.user_states[user_id] = Actions.MENU_ALERTS
+            return
+        
+        # Everything else - use buttons only!
+        await update.message.reply_text(
+            "⚠️ *Используйте кнопки для управления ботом.*\n\nНажмите /start для главного меню.",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("📱 Главное меню", callback_data=Actions.MENU_MAIN)
+            ]])
+        )
+    
+    # ============ MENU METHODS ============
+    
+    def _get_main_menu_text(self) -> str:
+        return """🐋 *Crypto Intelligence Bot*
+
+📊 Анализ криптовалют с ИИ
+🟢🟡🔴 Автоматические сигналы
+🔔 Круглосуточный мониторинг
+
+━━━━━━━━━━━━━━━
+👇 Выберите действие:"""
+
+    def _get_main_menu_keyboard(self) -> InlineKeyboardMarkup:
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("📊 Анализ", callback_data=Actions.MENU_ANALYSIS)],
+            [InlineKeyboardButton("👁️ Мой портфель", callback_data=Actions.MENU_WATCHLIST)],
+            [InlineKeyboardButton("📈 Сигналы", callback_data=Actions.MENU_SIGNALS)],
+            [InlineKeyboardButton("🔔 Оповещения", callback_data=Actions.MENU_ALERTS)],
+            [InlineKeyboardButton("💎 Подписка", callback_data=Actions.MENU_SUBSCRIBE)],
+            [InlineKeyboardButton("⚙️ Настройки", callback_data=Actions.MENU_SETTINGS)],
+            [InlineKeyboardButton("👑 Админ", callback_data=Actions.ADMIN_ENTER)]
+        ])
+    
+    async def _show_main_menu(self, query):
+        """Show main menu"""
+        await query.edit_message_text(
+            self._get_main_menu_text(),
+            parse_mode="Markdown",
+            reply_markup=self._get_main_menu_keyboard()
+        )
+    
+    # ============ ANALYSIS METHODS ============
+    
+    async def _show_analysis_menu(self, query):
+        """Show analysis selection menu"""
+        user_id = query.from_user.id
+        self.user_states[user_id] = Actions.MENU_ANALYSIS
+        
+        text = """📊 *Анализ монеты*
+
+Выберите способ анализа:"""
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔥 Популярные монеты", callback_data=Actions.SELECT_TOKEN)],
+            [InlineKeyboardButton("➕ Ввести свою монету", callback_data="custom_token_input")],
+            [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
+        ])
+        
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+    
+    async def _show_token_selection(self, query, purpose: str):
+        """Show popular tokens for selection"""
+        user_id = query.from_user.id
+        self.user_states[user_id] = f"select_token_{purpose}"
+        
+        text = """💎 *Выберите монету*
+
+Нажмите на монету для анализа:"""
+        
+        keyboard_buttons = []
+        for row in POPULAR_TOKENS:
+            button_row = [InlineKeyboardButton(token, callback_data=f"{Actions.TOKEN_SELECT}{purpose}_{token}") for token in row]
+            keyboard_buttons.append(button_row)
+        
+        keyboard_buttons.append([InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_ANALYSIS)])
+        
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard_buttons))
+    
+    async def _analyze_token(self, query, token: str):
+        """Analyze a token and show results"""
+        user_id = query.from_user.id
+        await query.edit_message_text(f"🔍 *Анализирую {token}...*")
+        
+        try:
+            if self.monitor:
+                result = await self.monitor.manual_check(user_id, token)
+            else:
+                result = "❌ Сервис анализа временно недоступен."
+            
+            # Format result as message
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("📊 Другой анализ", callback_data=Actions.MENU_ANALYSIS)],
+                [InlineKeyboardButton("👁️ Добавить в портфель", callback_data=f"{Actions.TOKEN_SELECT}watchlist_add_{token}")],
+                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+            ])
+            
+            await query.edit_message_text(result, parse_mode="Markdown", reply_markup=keyboard)
+            
+        except Exception as e:
+            await query.edit_message_text(
+                f"❌ Ошибка анализа: {str(e)}",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_ANALYSIS)
+                ]])
+            )
+    
+    # ============ WATCHLIST METHODS ============
+    
+    async def _show_watchlist_menu(self, query):
+        """Show watchlist menu"""
+        user_id = query.from_user.id
+        self.user_states[user_id] = Actions.MENU_WATCHLIST
+        
+        text = """👁️ *Мой портфель*
+
+Управление отслеживаемыми монетами:"""
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("👁️ Показать портфель", callback_data=Actions.WATCHLIST_SHOW)],
+            [InlineKeyboardButton("➕ Добавить монету", callback_data=Actions.WATCHLIST_ADD)],
+            [InlineKeyboardButton("➖ Удалить монету", callback_data=Actions.WATCHLIST_REMOVE)],
+            [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
+        ])
+        
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+    
+    async def _show_watchlist(self, query):
+        """Show user's watchlist"""
+        user_id = query.from_user.id
+        tokens = await self.db.get_user_watched_tokens(user_id)
+        
+        if not tokens:
+            text = "📋 *Ваш портфель пуст*\n\nДобавьте монеты для отслеживания."
+        else:
+            text = "👁️ *Ваш портфель:*\n\n"
+            
+            for token in tokens[:10]:
+                emoji = {"BUY": "🟢", "SELL": "🔴", "HOLD": "🟡", "WAIT": "⚪"}
+                rec = emoji.get(token.last_recommendation.value if token.last_recommendation else "?", "⚪")
+                
+                price = f"${token.current_price:,.2f}" if token.current_price else "N/A"
+                conf = f"{token.last_confidence:.0f}%" if token.last_confidence else ""
+                
+                text += f"{rec} *{token.token_symbol}*\n"
+                text += f"   💰 {price} | 📊 {conf}\n\n"
+        
+        keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_WATCHLIST)
+        ]])
+        
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+    
+    async def _add_to_watchlist(self, query, token: str):
+        """Add token to watchlist"""
+        user_id = query.from_user.id
+        
+        await self.db.add_watched_token(user_id, token, token)
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📊 Анализировать", callback_data=f"{Actions.TOKEN_SELECT}analysis_{token}")],
+            [InlineKeyboardButton("👁️ К портфелю", callback_data=Actions.MENU_WATCHLIST)],
+            [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+        ])
+        
+        await query.edit_message_text(
+            f"✅ *{token} добавлен в портфель!*\n\nТеперь будете получать сигналы по этой монете.",
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+    
+    async def _show_watchlist_remove(self, query):
+        """Show tokens to remove"""
+        user_id = query.from_user.id
+        tokens = await self.db.get_user_watched_tokens(user_id)
+        
+        if not tokens:
+            text = "📋 *Ваш портфель пуст*\n\nНечего удалять."
+        else:
+            text = "➖ *Выберите монету для удаления:*"
+            
+            keyboard_buttons = []
+            for token in tokens:
+                keyboard_buttons.append([
+                    InlineKeyboardButton(f"❌ {token.token_symbol}", callback_data=f"{Actions.TOKEN_REMOVE}{token.token_symbol}")
+                ])
+            
+            keyboard_buttons.append([InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_WATCHLIST)])
+            
+            await query.edit_message_text(text, parse_mode="Markdown", 
+                reply_markup=InlineKeyboardMarkup(keyboard_buttons))
+            return
+        
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_WATCHLIST)
+        ]]))
+    
+    async def _remove_from_watchlist(self, query, token: str):
+        """Remove token from watchlist"""
+        user_id = query.from_user.id
+        
+        await self.db.remove_watched_token(user_id, token)
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("👁️ К портфелю", callback_data=Actions.MENU_WATCHLIST)],
+            [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+        ])
+        
+        await query.edit_message_text(
+            f"✅ *{token} удалён из портфеля*",
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+    
+    # ============ SIGNALS METHODS ============
+    
+    async def _show_signals_menu(self, query):
+        """Show signals menu"""
+        user_id = query.from_user.id
+        self.user_states[user_id] = Actions.MENU_SIGNALS
+        
+        text = """📈 *Торговые сигналы*
+
+Актуальные сигналы от бота:"""
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📊 Активные сигналы", callback_data=Actions.SIGNALS_ACTIVE)],
+            [InlineKeyboardButton("📋 Мои сигналы", callback_data="my_signals")],
+            [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
+        ])
+        
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+    
+    async def _show_active_signals(self, query):
+        """Show active trading signals"""
+        signals = await self.db.get_active_signals()
+        
+        if not signals:
+            text = "📈 *Нет активных сигналов*\n\nСигналы появятся автоматически."
+        else:
+            text = "📈 *Активные сигналы:*\n\n"
+            
+            for signal in signals[:5]:
+                emoji = {"buy": "🟢", "sell": "🔴", "hold": "🟡", "wait": "⚪"}
+                e = emoji.get(signal.recommendation.value, "⚪")
+                
+                text += f"{e} *{signal.token_symbol}* — {signal.recommendation.value.upper()}\n"
+                text += f"   💰 ${signal.entry_price:,.2f} | 📊 {signal.confidence:.0f}%\n\n"
+        
+        keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_SIGNALS)
+        ]])
+        
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+    
+    # ============ ALERTS METHODS ============
+    
+    async def _show_alerts_menu(self, query):
+        """Show alerts menu"""
+        user_id = query.from_user.id
+        self.user_states[user_id] = Actions.MENU_ALERTS
+        
+        text = """🔔 *Оповещения*
+
+Настройте уведомления о ценах:"""
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔔 Мои оповещения", callback_data=Actions.ALERTS_SHOW)],
+            [InlineKeyboardButton("📈 Когда цена вырастет", callback_data=Actions.ALERTS_ABOVE)],
+            [InlineKeyboardButton("📉 Когда цена упадёт", callback_data=Actions.ALERTS_BELOW)],
+            [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
+        ])
+        
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+    
+    async def _show_alerts_type_selection(self, query):
+        """Show alert type selection"""
+        text = """🔔 *Новое оповещение*
+
+Выберите тип оповещения:"""
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("📈 Цена ВЫШЕ", callback_data=Actions.ALERTS_ABOVE)],
+            [InlineKeyboardButton("📉 Цена НИЖЕ", callback_data=Actions.ALERTS_BELOW)],
+            [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_ALERTS)]
+        ])
+        
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+    
+    async def _set_price_alert(self, query, token: str, direction: str):
+        """Start price alert setup"""
+        user_id = query.from_user.id
+        self.user_states[user_id] = f"alert_price_{token}_{direction}"
+        
+        direction_text = "выше" if direction == "above" else "ниже"
+        emoji = "📈" if direction == "above" else "📉"
+        
+        text = f"""{emoji} *Оповещение: {token}*
+
+Когда цена будет {direction_text}?
+
+Введите целевую цену (число):"""
+        
+        keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton("🔙 Отмена", callback_data=Actions.MENU_ALERTS)
+        ]])
+        
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+    
+    async def _create_price_alert(self, message, token: str, direction: str, price: float):
+        """Create a price alert"""
+        user_id = message.from_user.id
+        
+        from ..database.models import AlertType
+        alert_type = AlertType.PRICE_ABOVE if direction == "above" else AlertType.PRICE_BELOW
+        
+        await self.db.create_price_alert(user_id, token, alert_type, price)
+        
+        emoji = "📈" if direction == "above" else "📉"
+        direction_text = "выше" if direction == "above" else "ниже"
+        
+        await message.reply_text(
+            f"{emoji} *Оповещение создано!*\n\n"
+            f"📊 {token}\n"
+            f"Когда цена будет {direction_text}: ${price:,.2f}\n\n"
+            f"Вы получите уведомление!",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔔 К оповещениям", callback_data=Actions.MENU_ALERTS)
+            ]])
+        )
+    
+    async def _show_user_alerts(self, query):
+        """Show user's alerts"""
+        user_id = query.from_user.id
+        alerts = await self.db.get_user_alerts(user_id)
+        
+        if not alerts:
+            text = "🔔 *Нет активных оповещений*\n\nСоздайте новое оповещение."
+        else:
+            text = "🔔 *Ваши оповещения:*\n\n"
+            
+            for alert in alerts[:10]:
+                emoji = "📈" if alert.alert_type.value == "price_above" else "📉"
+                status = "✅" if alert.status.value == "active" else "⏸️"
+                
+                text += f"{emoji} {status} *{alert.token_symbol}*\n"
+                text += f"   ${alert.target_value:,.2f}\n\n"
+        
+        keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_ALERTS)
+        ]])
+        
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+    
+    # ============ SUBSCRIBE METHODS ============
+    
+    async def _show_subscribe_menu(self, query):
+        """Show subscription menu"""
+        user_id = query.from_user.id
+        self.user_states[user_id] = Actions.MENU_SUBSCRIBE
+        
+        text = """💎 *Подписки*
+
+Выберите план подписки:"""
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🎁 TRIAL — 5 дней ($2.99)", callback_data=Actions.SUB_TRIAL)],
+            [InlineKeyboardButton("⭐ STANDARD — 7 дней ($4.99)", callback_data=Actions.SUB_STANDARD)],
+            [InlineKeyboardButton("💎 PREMIUM — 30 дней ($14.99)", callback_data=Actions.SUB_PREMIUM)],
+            [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
+        ])
+        
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+    
+    async def _show_subscription_details(self, query, plan: str):
+        """Show subscription details"""
+        plans = {
+            Actions.SUB_TRIAL: ("TRIAL", "5 дней", "$2.99", "10 анализов/день"),
+            Actions.SUB_STANDARD: ("STANDARD", "7 дней", "$4.99", "30 анализов/день"),
+            Actions.SUB_PREMIUM: ("PREMIUM", "30 дней", "$14.99", "∞ анализов")
+        }
+        
+        name, duration, price, limit = plans.get(plan, ("Unknown", "?", "?", "?"))
+        
+        text = f"""💎 *Подписка {name}*
+
+💰 Цена: {price}
+📅 Длительность: {duration}
+📊 Лимит: {limit} анализов/день
+
+━━━━━━━━━━━━━━━
+
+💡 *Оплата криптовалютой:*
+
+*USDT (TRC20):*
+`TJYbKShKhCfNMXKj9p1Gaz2KfK5w7xPqVJ`
+
+*После оплаты отправьте TX hash боту*
+(через кнопку "Оплата" ниже)"""
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("💳 Отправить TX hash", callback_data="input_tx_hash")],
+            [InlineKeyboardButton("🔙 К подпискам", callback_data=Actions.MENU_SUBSCRIBE)],
+            [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+        ])
+        
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+    
+    # ============ SETTINGS METHODS ============
+    
+    async def _show_settings_menu(self, query):
+        """Show settings menu"""
+        user_id = query.from_user.id
+        user = await self.db.get_user(user_id)
+        
+        self.user_states[user_id] = Actions.MENU_SETTINGS
+        
+        sig_status = "✅ ВКЛ" if user.notify_on_signal else "❌ ВЫКЛ"
+        whale_status = "✅ ВКЛ" if user.notify_on_whale else "❌ ВЫКЛ"
+        price_status = "✅ ВКЛ" if user.notify_on_price_alert else "❌ ВЫКЛ"
+        
+        text = """⚙️ *Настройки уведомлений*
+
+Включите/выключите уведомления:"""
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton(f"🔔 Сигналы: {sig_status}", callback_data=Actions.SETTINGS_NOTIFY_SIGNALS)],
+            [InlineKeyboardButton(f"🐋 Киты: {whale_status}", callback_data=Actions.SETTINGS_NOTIFY_WHALE)],
+            [InlineKeyboardButton(f"💰 Цены: {price_status}", callback_data=Actions.SETTINGS_NOTIFY_PRICE)],
+            [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
+        ])
+        
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+    
+    async def _toggle_setting(self, query, setting: str):
+        """Toggle a setting"""
+        user_id = query.from_user.id
+        user = await self.db.get_user(user_id)
+        
+        if setting == "signal":
+            await self.db.update_user(user_id, notify_on_signal=not user.notify_on_signal)
+        elif setting == "whale":
+            await self.db.update_user(user_id, notify_on_whale=not user.notify_on_whale)
+        elif setting == "price":
+            await self.db.update_user(user_id, notify_on_price_alert=not user.notify_on_price_alert)
+        
+        await self._show_settings_menu(query)
+    
+    # ============ ADMIN METHODS ============
+    
+    def _get_admin_keyboard(self) -> InlineKeyboardMarkup:
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("📊 Статистика", callback_data=Actions.ADMIN_STATS)],
+            [InlineKeyboardButton("👥 Пользователи", callback_data=Actions.ADMIN_USERS)],
+            [InlineKeyboardButton("📢 Рассылка", callback_data=Actions.ADMIN_BROADCAST)],
+            [InlineKeyboardButton("🔙 Выход", callback_data=Actions.MENU_MAIN)]
+        ])
+    
+    async def _request_admin_password(self, query):
+        """Request admin password"""
+        user_id = query.from_user.id
+        
+        # Check if user is in admin list
+        if user_id not in self.admin_ids:
+            await query.edit_message_text(
+                "❌ *Доступ запрещён*\n\nУ вас нет прав администратора.",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                ]])
+            )
+            return
+        
+        self.user_states[user_id] = Actions.ADMIN_ENTER
+        self.admin_attempts[user_id] = 0
+        
+        await query.edit_message_text(
+            "🔐 *Введите пароль администратора:*\n\nЭто ЕДИНСТВЕННЫЙ случай когда можно ввести текст.",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔙 Отмена", callback_data=Actions.MENU_MAIN)
+            ]])
+        )
+    
+    async def _show_admin_menu(self, query):
+        """Show admin menu"""
+        await query.edit_message_text(
+            "👑 *Админ-панель*\n\nВыберите действие:",
+            parse_mode="Markdown",
+            reply_markup=self._get_admin_keyboard()
+        )
+    
+    async def _show_admin_stats(self, query):
+        """Show admin statistics"""
+        stats = await self.db.get_stats()
+        
+        text = f"""📊 *Статистика бота*
+
+👥 Пользователей: {stats['users']}
+👁️ Отслеживают монеты: {stats['watched_tokens']}
+🔔 Активных оповещений: {stats['active_alerts']}
+📈 Активных сигналов: {stats['active_signals']}
+
+🕐 {datetime.utcnow().strftime('%H:%M:%S %d.%m.%Y')}"""
+        
+        keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton("🔙 К админ-панели", callback_data=Actions.ADMIN_MENU)
+        ]])
+        
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+    
+    async def _show_admin_users(self, query):
+        """Show user statistics"""
+        stats = await self.db.get_stats()
+        
+        text = f"""👥 *Пользователи*
+
+Всего пользователей: {stats['users']}
+
+📋 Действия с пользователями будут доступны в следующих версиях."""
+        
+        keyboard = InlineKeyboardMarkup([[
+            InlineKeyboardButton("🔙 К админ-панели", callback_data=Actions.ADMIN_MENU)
+        ]])
+        
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+    
+    async def _request_broadcast_message(self, query):
+        """Request broadcast message"""
+        user_id = query.from_user.id
+        self.user_states[user_id] = "broadcast_input"
+        
+        await query.edit_message_text(
+            "📢 *Рассылка*\n\nВведите сообщение для рассылки всем пользователям:",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("🔙 Отмена", callback_data=Actions.ADMIN_MENU)
+            ]])
+        )
+    
+    # ============ MONITORING ============
+    
+    async def start_monitoring(self):
+        """Start background monitoring"""
+        if self.monitor:
+            await self.monitor.start()
+    
+    async def stop_monitoring(self):
+        """Stop background monitoring"""
+        if self.monitor:
+            await self.monitor.stop()
+    
+    def run(self):
+        """Run the bot"""
+        app = self.create_app()
+        
+        print("🤖 Crypto Intelligence Bot (Button-Only)")
+        print("📱 All interaction through buttons only!")
+        print("🔐 Admin password required for admin panel")
+        
+        try:
+            app.run_polling(allowed_updates=["callback_query"])
+        except KeyboardInterrupt:
+            print("\n🛑 Bot stopped")
