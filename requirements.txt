@@ -1,18 +1,17 @@
 # Core dependencies
-python-telegram-bot==20.7
-aiohttp==3.9.1
-pydantic==2.5.2
-python-dotenv==1.0.0
+python-telegram-bot>=20.7
+aiohttp>=3.9.1
+pydantic>=2.5.2
+python-dotenv>=1.0.0
 
 # API clients
-requests==2.31.0
-httpx==0.26.0
+requests>=2.31.0
 
 # Database
-aiosqlite==0.19.0
+aiosqlite>=0.19.0
 
 # Logging
-loguru==0.7.2
+loguru>=0.7.2
 
 # Timezone
-pytz==2024.1
+pytz>=2024.1
