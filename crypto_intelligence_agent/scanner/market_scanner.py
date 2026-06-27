@@ -2,13 +2,34 @@
 Market Scanner - Автоматический поиск лучших монет для покупки
 
 Сканирует рынок и находит монеты с высоким потенциалом роста.
+ИСКЛЮЧАЕТ стейблкоины (USDT, USDC, BUSD и т.д.)
 """
 import asyncio
 import aiohttp
 from datetime import datetime, timedelta
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Set
 from dataclasses import dataclass, field
 from loguru import logger
+
+
+# Стейблкоины для исключения
+STABLECOINS: Set[str] = {
+    "usdt", "usdc", "busd", "dai", "husd", "susd", "nusd", 
+    "frax", "lusd", "alusd", "musd", "ousd", "usdp", "usdd",
+    "tusd", "xidr", "jpyx", "eurx", "gbpx", "cnhx", "btcx"
+}
+
+# Символы стейблкоинов для исключения
+STABLECOIN_SYMBOLS: Set[str] = {
+    "USDT", "USDC", "BUSD", "DAI", "HUSD", "SUSD", "NUSD",
+    "FRAX", "LUSD", "ALUSD", "MUSD", "OUSD", "USDP", "USDD",
+    "TUSD", "XIDR", "JPYX", "EURX", "GBPX", "CNHX", "BTCX",
+    "UST", "USTC", "LUNA", "LUNA2",  # Крашнувшие стейблкоины
+    "USD1", "USD1",  # Worldcoin stablecoin
+    "GUSD", "SUSD",  # Gemini, Silvergate
+    "EURI", "SEUR",  # Euro stablecoins
+    "XAUT", "PAXG",  # Precious metal backed
+}
 
 
 @dataclass
@@ -97,7 +118,7 @@ class MarketScanner:
             await self.session.close()
     
     async def scan_market(self, limit: int = 100) -> List[CoinAnalysis]:
-        """Полное сканирование рынка"""
+        """Полное сканирование рынка (без стейблкоинов)"""
         logger.info(f"Starting market scan (limit={limit})...")
         
         session = await self._get_session()
@@ -109,8 +130,27 @@ class MarketScanner:
             if not coins_data:
                 return self._scan_cache
             
+            # Фильтруем стейблкоины
+            filtered_coins = []
+            for coin in coins_data:
+                symbol = coin.get("symbol", "").upper()
+                name = coin.get("name", "").lower()
+                
+                # Пропускаем стейблкоины
+                if symbol in STABLECOIN_SYMBOLS:
+                    continue
+                if name in STABLECOINS:
+                    continue
+                # Также исключаем wrapped токены
+                if symbol.startswith("W") and len(symbol) <= 5:
+                    continue
+                
+                filtered_coins.append(coin)
+            
+            logger.info(f"Filtered {len(coins_data) - len(filtered_coins)} stablecoins, analyzing {len(filtered_coins)} coins")
+            
             # Анализируем каждую монету
-            tasks = [self._analyze_coin(session, coin) for coin in coins_data[:50]]
+            tasks = [self._analyze_coin(session, coin) for coin in filtered_coins[:50]]
             results = await asyncio.gather(*tasks, return_exceptions=True)
             
             analyses = [r for r in results if isinstance(r, CoinAnalysis)]
@@ -124,7 +164,7 @@ class MarketScanner:
             self._scan_cache = analyses
             self._last_scan = datetime.utcnow()
             
-            logger.info(f"Scan complete: {len(analyses)} coins analyzed")
+            logger.info(f"Scan complete: {len(analyses)} coins analyzed (no stablecoins)")
             return analyses
             
         except Exception as e:
