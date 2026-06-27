@@ -25,7 +25,7 @@ def setup_logging():
     logger.remove()
     logger.add(
         sys.stderr,
-        format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <message>",
+        format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {message}",
         level="INFO"
     )
     
