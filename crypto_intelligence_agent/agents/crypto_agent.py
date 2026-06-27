@@ -51,6 +51,39 @@ class RiskAssessment:
 
 
 @dataclass
+class Recommendation:
+    """Trading recommendation based on analysis"""
+    action: str  # BUY, SELL, HOLD, WAIT
+    confidence: float  # 0-100%
+    rationale: List[str] = field(default_factory=list)
+    entry_target: Optional[float] = None
+    stop_loss: Optional[float] = None
+    take_profit: Optional[float] = None
+    
+    @property
+    def emoji(self) -> str:
+        """Get emoji for action"""
+        mapping = {
+            "BUY": "🟢",
+            "SELL": "🔴",
+            "HOLD": "🟡",
+            "WAIT": "⚪"
+        }
+        return mapping.get(self.action, "❓")
+    
+    @property
+    def color_hex(self) -> str:
+        """Get color for action"""
+        mapping = {
+            "BUY": "#00C853",
+            "SELL": "#D50000",
+            "HOLD": "#FFD600",
+            "WAIT": "#9E9E9E"
+        }
+        return mapping.get(self.action, "#9E9E9E")
+
+
+@dataclass
 class CryptoReport:
     """Complete crypto analysis report"""
     token: str
@@ -61,6 +94,7 @@ class CryptoReport:
     
     scores: CryptoScores = field(default_factory=CryptoScores)
     risk: RiskAssessment = field(default_factory=lambda: RiskAssessment("HIGH", ""))
+    recommendation: Recommendation = field(default_factory=lambda: Recommendation("WAIT", 0))
     
     bullish_signals: List[str] = field(default_factory=list)
     bearish_signals: List[str] = field(default_factory=list)
@@ -88,6 +122,14 @@ class CryptoReport:
                 "description": self.risk.description,
                 "probability": self.risk.probability
             },
+            "recommendation": {
+                "action": self.recommendation.action,
+                "confidence": self.recommendation.confidence,
+                "rationale": self.recommendation.rationale,
+                "entry_target": self.recommendation.entry_target,
+                "stop_loss": self.recommendation.stop_loss,
+                "take_profit": self.recommendation.take_profit
+            },
             "bullish_signals": self.bullish_signals,
             "bearish_signals": self.bearish_signals,
             "risks": self.risks,
@@ -104,8 +146,13 @@ class CryptoReport:
         }
         emoji = emoji_map.get(self.risk.level, "⚪")
         
+        # Recommendation block
+        rec_emoji = self.recommendation.emoji
+        rec_action = self.recommendation.action
+        
         lines = [
             f"📊 *Анализ токена: {self.token.upper()}*\n",
+            f"{rec_emoji} *РЕКОМЕНДАЦИЯ: {rec_action}* (Уверенность: {self.recommendation.confidence:.0f}%)\n",
             f"{emoji} *AI Confidence Score: {self.scores.total_score:.1f}%*\n",
             f"📈 Риск: {self.risk.level} ({self.risk.probability} вероятность роста)\n",
             f"\n💰 *Рыночные данные:*",
@@ -120,6 +167,22 @@ class CryptoReport:
             f"• Technical Score: {self.scores.technical_score:.1f}/100",
             f"• Volume Score: {self.scores.volume_score:.1f}/100",
         ]
+        
+        # Add trading levels if available
+        if self.recommendation.stop_loss or self.recommendation.take_profit:
+            lines.extend([f"\n📈 *Торговые уровни:*"])
+            if self.recommendation.entry_target:
+                lines.append(f"• Вход (Entry): ${self.recommendation.entry_target:,.6f}")
+            if self.recommendation.take_profit:
+                lines.append(f"• Тейк-профит (TP): ${self.recommendation.take_profit:,.6f}")
+            if self.recommendation.stop_loss:
+                lines.append(f"• Стоп-лосс (SL): ${self.recommendation.stop_loss:,.6f}")
+        
+        # Rationale
+        if self.recommendation.rationale:
+            lines.extend([f"\n💡 *Обоснование:*"])
+            for r in self.recommendation.rationale[:3]:
+                lines.append(f"• {r}")
         
         if self.bullish_signals:
             lines.extend([f"\n🟢 *Бычьи сигналы:*"])
@@ -218,6 +281,9 @@ class CryptoIntelligenceAgent(BaseAgent):
             report.bullish_signals = self._extract_bullish_signals(results)
             report.risks = self._extract_risks(results)
             
+            # Calculate recommendation
+            report.recommendation = self._calculate_recommendation(scores, results, report)
+            
             return AgentResponse(
                 success=True,
                 data=report.to_dict()
@@ -251,6 +317,176 @@ class CryptoIntelligenceAgent(BaseAgent):
             level=level,
             description=desc,
             factors=[]
+        )
+    
+    def _calculate_recommendation(
+        self, 
+        scores: CryptoScores, 
+        results: Dict,
+        report: CryptoReport
+    ) -> Recommendation:
+        """
+        Calculate trading recommendation based on all indicators
+        
+        Logic:
+        - BUY if strong indicators and favorable conditions
+        - SELL if bearish signals dominate
+        - HOLD if mixed signals
+        - WAIT if insufficient data or extreme risk
+        """
+        rationale = []
+        current_price = report.price or 0
+        
+        # Count positive and negative signals
+        positive_signals = 0
+        negative_signals = 0
+        
+        # Social analysis
+        social = results.get("social", {})
+        if social.get("mentions_growth_24h", 0) > 30:
+            positive_signals += 1
+            rationale.append("Рост упоминаний в соцсетях")
+        elif social.get("mentions_growth_24h", 0) < -20:
+            negative_signals += 1
+            rationale.append("Падение интереса в соцсетях")
+        
+        # Whale analysis - weighted more heavily
+        whale = results.get("whale", {})
+        if whale.get("accumulation_score", 0) > 50:
+            positive_signals += 2
+            rationale.append("Аккумуляция китов")
+        if whale.get("large_buys", 0) > whale.get("large_sells", 0):
+            positive_signals += 1
+            rationale.append("Преобладание крупных покупок")
+        if whale.get("distribution_score", 0) > 50:
+            negative_signals += 2
+            rationale.append("Дистрибуция китов - продают крупные")
+        
+        # Technical analysis
+        tech = results.get("technical", {})
+        indicators = tech.get("indicators", {})
+        
+        rsi = indicators.get("rsi")
+        if rsi:
+            if rsi < 35:
+                positive_signals += 2
+                rationale.append(f"RSI={rsi:.0f} перепродан")
+            elif rsi > 70:
+                negative_signals += 1
+                rationale.append(f"RSI={rsi:.0f} перекуплен")
+        
+        macd_bullish = indicators.get("macd_bullish", False)
+        macd_hist = indicators.get("macd_histogram", 0)
+        
+        if macd_bullish:
+            positive_signals += 1
+            rationale.append("MACD бычий")
+        elif macd_hist < 0:
+            negative_signals += 1
+            rationale.append("MACD медвежий")
+        
+        volatility = indicators.get("volatility", 0.05)
+        
+        # Volume analysis - weighted more
+        volume = results.get("volume", {})
+        if volume.get("volume_spike"):
+            positive_signals += 1
+            rationale.append("Аномальный рост объема")
+        if volume.get("volume_trend") == "increasing":
+            positive_signals += 1
+            rationale.append("Растущий объем")
+        elif volume.get("volume_trend") == "decreasing":
+            negative_signals += 1
+            rationale.append("Падающий объем")
+        
+        # Sentiment analysis
+        sentiment = results.get("sentiment", {})
+        if sentiment.get("bullish_ratio", 0) > 0.55:
+            positive_signals += 1
+            rationale.append("Бычьи настроения")
+        elif sentiment.get("bearish_ratio", 0) > 0.55:
+            negative_signals += 1
+            rationale.append("Медвежьи настроения")
+        
+        # Calculate signal-based confidence
+        total_signals = positive_signals + negative_signals
+        if total_signals > 0:
+            signal_confidence = (positive_signals / total_signals) * 100
+        else:
+            signal_confidence = 50
+        
+        # Use only signal confidence if social score is 0 (no Twitter API)
+        # This gives better recommendations without Twitter data
+        if scores.social_score < 1:
+            final_confidence = signal_confidence
+        else:
+            final_confidence = (scores.total_score * 0.6 + signal_confidence * 0.4)
+        
+        # Determine action based on score and signals
+        # Use available scores (excluding social if 0)
+        available_score = scores.total_score
+        if scores.social_score < 1:
+            # Recalculate without social
+            available_score = (
+                scores.sentiment_score * 0.20 +
+                scores.whale_score * 0.30 +
+                scores.technical_score * 0.25 +
+                scores.volume_score * 0.25
+            )
+        
+        if available_score >= 60:
+            if positive_signals > negative_signals:
+                action = "BUY"
+            elif negative_signals > positive_signals:
+                action = "HOLD"
+            else:
+                action = "HOLD"
+        elif available_score >= 45:
+            if positive_signals > negative_signals + 1:
+                action = "BUY"
+            elif negative_signals > positive_signals + 1:
+                action = "SELL"
+            else:
+                action = "HOLD"
+        elif available_score >= 35:
+            if positive_signals > negative_signals + 2:
+                action = "BUY"
+            elif negative_signals > positive_signals + 2:
+                action = "SELL"
+            else:
+                action = "WAIT"
+        else:  # < 35
+            if negative_signals >= positive_signals:
+                action = "SELL"
+            else:
+                action = "WAIT"
+        
+        # Calculate trading levels
+        entry_target = None
+        stop_loss = None
+        take_profit = None
+        
+        if current_price > 0 and action in ["BUY", "HOLD"]:
+            entry_target = current_price
+            
+            # Stop loss based on volatility
+            stop_loss = current_price * (1 - max(0.05, volatility * 2))
+            
+            # Take profit based on confidence
+            if final_confidence > 65:
+                take_profit = current_price * 1.25
+            elif final_confidence > 50:
+                take_profit = current_price * 1.15
+            else:
+                take_profit = current_price * 1.10
+        
+        return Recommendation(
+            action=action,
+            confidence=final_confidence,
+            rationale=rationale[:5],
+            entry_target=entry_target,
+            stop_loss=stop_loss,
+            take_profit=take_profit
         )
     
     def _extract_bullish_signals(self, results: Dict) -> List[str]:
