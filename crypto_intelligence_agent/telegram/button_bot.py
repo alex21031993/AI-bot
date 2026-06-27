@@ -106,6 +106,9 @@ class Actions:
     PERIOD_1H = "period_1h"
     PERIOD_3H = "period_3h"
     PERIOD_24H = "period_24h"
+    
+    # Admin panel (for when admin is already authenticated)
+    ADMIN_PANEL = "admin_panel"
 
 
 class ButtonBot:
@@ -336,6 +339,9 @@ class ButtonBot:
         elif data == Actions.PERIOD_24H:
             await self._analyze_period(query, 1440)
         
+        elif data == Actions.ADMIN_PANEL:
+            await self._show_admin_panel(query)
+        
         elif data == Actions.SELECT_TOKEN:
             await self._show_token_selection(query, "analysis")
         
@@ -515,17 +521,18 @@ class ButtonBot:
     def _get_main_menu_keyboard(self, user_trial_active: bool = True, is_admin: bool = False, days_remaining: int = 3) -> InlineKeyboardMarkup:
         """
         Get main menu keyboard
-        - If trial active or admin: show all buttons
-        - If trial expired: show only subscription button
+        - Admin: full access (no days counter)
+        - Trial active: all buttons + days remaining
+        - Trial expired: subscription only
         """
-        # Admin has full access
+        # Admin has full access (no trial needed)
         if is_admin:
             return InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔍 НАЙТИ МОНЕТЫ", callback_data=Actions.SCAN_BUY_SIGNALS)],
                 [InlineKeyboardButton("📊 ТОП-10", callback_data=Actions.SCAN_TOP_10)],
                 [InlineKeyboardButton("📈 СИГНАЛЫ", callback_data=Actions.SCAN_SIGNALS)],
                 [InlineKeyboardButton("🔄 ОБНОВИТЬ", callback_data=Actions.SCAN_REFRESH)],
-                [InlineKeyboardButton("💎 PREMIUM СИГНАЛ", callback_data=Actions.PREMIUM_SIGNAL)],
+                [InlineKeyboardButton("⏱️ АНАЛИЗ ПЕРИОДА", callback_data=Actions.PREMIUM_SIGNAL)],
                 [InlineKeyboardButton("🔔 Оповещения", callback_data=Actions.MENU_ALERTS)],
                 [InlineKeyboardButton("👑 АДМИН-ПАНЕЛЬ", callback_data=Actions.ADMIN_PANEL)],
                 [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
@@ -537,7 +544,7 @@ class ButtonBot:
                 [InlineKeyboardButton("💳 КУПИТЬ ПОДПИСКУ", callback_data=Actions.MENU_SUBSCRIBE)]
             ])
         
-        # Trial active - show all buttons
+        # Trial active - show all buttons + days remaining
         return InlineKeyboardMarkup([
             [InlineKeyboardButton("🔍 НАЙТИ МОНЕТЫ", callback_data=Actions.SCAN_BUY_SIGNALS)],
             [InlineKeyboardButton("📊 ТОП-10", callback_data=Actions.SCAN_TOP_10)],
@@ -826,6 +833,28 @@ class ButtonBot:
             )
     
     # ============ PAYMENT METHODS ============
+    
+    async def _show_admin_panel(self, query):
+        """Показать админ-панель"""
+        user_id = query.from_user.id
+        
+        if user_id not in self.admin_ids:
+            await query.edit_message_text(
+                "❌ Доступ запрещён!",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                ]])
+            )
+            return
+        
+        await query.edit_message_text(
+            "👑 *АДМИН-ПАНЕЛЬ*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "👋 Добро пожаловать, администратор!\n\n"
+            "💎 У вас полный доступ ко всем функциям!",
+            parse_mode="Markdown",
+            reply_markup=self._get_admin_keyboard()
+        )
     
     async def _show_premium_signal(self, query):
         """Показать выбор периода анализа или результат анализа"""
