@@ -100,6 +100,12 @@ class Actions:
     
     # Premium actions
     PREMIUM_SIGNAL = "premium_signal"
+    
+    # Time period actions
+    PERIOD_30MIN = "period_30min"
+    PERIOD_1H = "period_1h"
+    PERIOD_3H = "period_3h"
+    PERIOD_24H = "period_24h"
 
 
 class ButtonBot:
@@ -318,6 +324,18 @@ class ButtonBot:
         elif data == Actions.PREMIUM_SIGNAL:
             await self._show_premium_signal(query)
         
+        elif data == Actions.PERIOD_30MIN:
+            await self._analyze_period(query, 30)
+        
+        elif data == Actions.PERIOD_1H:
+            await self._analyze_period(query, 60)
+        
+        elif data == Actions.PERIOD_3H:
+            await self._analyze_period(query, 180)
+        
+        elif data == Actions.PERIOD_24H:
+            await self._analyze_period(query, 1440)
+        
         elif data == Actions.SELECT_TOKEN:
             await self._show_token_selection(query, "analysis")
         
@@ -494,7 +512,7 @@ class ButtonBot:
 ━━━━━━━━━━━━━━━
 👇 Выберите действие:"""
 
-    def _get_main_menu_keyboard(self, user_trial_active: bool = True, is_admin: bool = False) -> InlineKeyboardMarkup:
+    def _get_main_menu_keyboard(self, user_trial_active: bool = True, is_admin: bool = False, days_remaining: int = 3) -> InlineKeyboardMarkup:
         """
         Get main menu keyboard
         - If trial active or admin: show all buttons
@@ -525,9 +543,9 @@ class ButtonBot:
             [InlineKeyboardButton("📊 ТОП-10", callback_data=Actions.SCAN_TOP_10)],
             [InlineKeyboardButton("📈 СИГНАЛЫ", callback_data=Actions.SCAN_SIGNALS)],
             [InlineKeyboardButton("🔄 ОБНОВИТЬ", callback_data=Actions.SCAN_REFRESH)],
-            [InlineKeyboardButton("💎 PREMIUM СИГНАЛ", callback_data=Actions.PREMIUM_SIGNAL)],
+            [InlineKeyboardButton("⏱️ АНАЛИЗ ПЕРИОДА", callback_data=Actions.PREMIUM_SIGNAL)],
             [InlineKeyboardButton("🔔 Оповещения", callback_data=Actions.MENU_ALERTS)],
-            [InlineKeyboardButton("💳 Подписка", callback_data=Actions.MENU_SUBSCRIBE)],
+            [InlineKeyboardButton(f"⏰ {days_remaining} дней осталось", callback_data="noop")],
             [InlineKeyboardButton("👑 Админ", callback_data=Actions.ADMIN_ENTER)]
         ])
     
@@ -538,6 +556,7 @@ class ButtonBot:
         # Check if trial is active for non-admin users
         user_trial_active = True
         is_admin = user_id in self.admin_ids
+        days_remaining = 3
         
         if not is_admin:
             user = await self.db.get_user(user_id)
@@ -545,6 +564,13 @@ class ButtonBot:
                 from datetime import timedelta
                 trial_end = user.created_at + timedelta(days=3)
                 user_trial_active = datetime.utcnow() < trial_end
+                
+                # Calculate days remaining
+                if user_trial_active:
+                    time_left = trial_end - datetime.utcnow()
+                    days_remaining = max(0, time_left.days)
+                    if time_left.seconds > 0 and days_remaining == 0:
+                        days_remaining = 1  # At least 1 day if still active
         
         # If trial expired - show subscription only
         if not is_admin and not user_trial_active:
@@ -554,7 +580,7 @@ class ButtonBot:
 
 ⏰ *Ваш бесплатный период истёк!*
 
-📅 Пробный период: 3 дня
+📅 Пробный период: 3 дня (закончился)
 
 💎 *Подписка открывает:*
 • Все функции без ограничений
@@ -571,11 +597,11 @@ class ButtonBot:
             )
             return
         
-        # Show full menu
+        # Show full menu with days remaining
         await query.edit_message_text(
             self._get_main_menu_text(),
             parse_mode="Markdown",
-            reply_markup=self._get_main_menu_keyboard(user_trial_active=True, is_admin=is_admin)
+            reply_markup=self._get_main_menu_keyboard(user_trial_active=True, is_admin=is_admin, days_remaining=days_remaining)
         )
     
     # ============ SCANNER METHODS ============
@@ -802,12 +828,8 @@ class ButtonBot:
     # ============ PAYMENT METHODS ============
     
     async def _show_premium_signal(self, query):
-        """Показать Premium сигнал одной монеты дня"""
+        """Показать выбор периода анализа или результат анализа"""
         user_id = query.from_user.id
-        
-        await query.edit_message_text(
-            "💎 *PREMIUM АНАЛИЗ*\n\n⏳ Провожу глубокий анализ монеты дня..."
-        )
         
         try:
             # Проверяем подписку или админ
@@ -825,7 +847,9 @@ class ButtonBot:
                 trial_end = user.created_at + timedelta(days=3)
                 user_trial_active = datetime.utcnow() < trial_end
             
-            if not is_premium and not user_trial_active and user_id not in self.admin_ids:
+            has_access = is_premium or user_trial_active or user_id in self.admin_ids
+            
+            if not has_access:
                 # Показываем превью обычного анализа
                 coins = await self.scanner.scan_market(50)
                 if coins:
@@ -833,7 +857,7 @@ class ButtonBot:
                     
                     text = f"""🔒 *PREMIUM ДОСТУП*
 
-💎 Для просмотра полного анализа нужна подписка!
+⏰ Ваш пробный период истёк!
 
 ━━━━━━━━━━━━━━━
 
@@ -844,50 +868,103 @@ class ButtonBot:
 
 ━━━━━━━━━━━━━━━
 
-💎 *Что дает Premium:*
-• 1 монета дня с полным анализом
+💎 *Подписка открывает:*
+• Анализ на 30 мин, 1ч, 3ч, 24ч
 • Прогноз пампа/дампа
-• Входные точки
-• Все источники данных
-• Уведомления за 15 минут до события
+• Китовый анализ
+• Уведомления за 15 минут
 
-💰 Стоимость: $14.99/месяц
+💰 Стоимость: от $2.99
 """
                     
                     keyboard = InlineKeyboardMarkup([
-                        [InlineKeyboardButton("💎 КУПИТЬ PREMIUM", callback_data=Actions.PAY_PREMIUM)],
-                        [InlineKeyboardButton("📊 СМОТРЕТЬ ТОП-10", callback_data=Actions.SCAN_TOP_10)],
+                        [InlineKeyboardButton("💳 КУПИТЬ ПОДПИСКУ", callback_data=Actions.MENU_SUBSCRIBE)],
                         [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
                     ])
                     
                     await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
                 return
             
-            # Premium пользователь - показываем полный анализ
+            # Показываем выбор периода анализа
+            text = """⏱️ *ВЫБЕРИТЕ ПЕРИОД АНАЛИЗА*
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+🐋 Выберите временной период для анализа монеты:
+
+📊 *Доступные периоды:*
+• 🕐 30 минут - краткосрочный
+• 🕐 1 час - среднесрочный
+• 🕐 3 часа - долгосрочный
+• 🕐 24 часа - суточный
+
+💎 Будет проанализирована 1 монета с:
+• Прогнозом пампа/дампа
+• Китовым анализом
+• Входными точками
+• Уведомлением за 15 минут
+"""
+            
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🕐 30 МИНУТ", callback_data=Actions.PERIOD_30MIN)],
+                [InlineKeyboardButton("🕐 1 ЧАС", callback_data=Actions.PERIOD_1H)],
+                [InlineKeyboardButton("🕐 3 ЧАСА", callback_data=Actions.PERIOD_3H)],
+                [InlineKeyboardButton("🕐 24 ЧАСА", callback_data=Actions.PERIOD_24H)],
+                [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
+            ])
+            
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+            
+        except Exception as e:
+            await query.edit_message_text(
+                f"❌ Ошибка: {str(e)}",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                ]])
+            )
+    
+    async def _analyze_period(self, query, period_minutes: int):
+        """Анализ монеты за выбранный период"""
+        user_id = query.from_user.id
+        
+        period_names = {
+            30: "30 минут",
+            60: "1 час",
+            180: "3 часа",
+            1440: "24 часа"
+        }
+        
+        await query.edit_message_text(
+            f"⏱️ *АНАЛИЗ НА {period_names.get(period_minutes, str(period_minutes))}*\n\n"
+            f"🔍 Ищу монету с наибольшим потенциалом...\n"
+            f"📊 Провожу глубокий анализ..."
+        )
+        
+        try:
+            # Получаем анализ
             analysis = await self.premium_scanner.get_today_coin()
             
             if not analysis:
                 await query.edit_message_text(
                     "❌ Ошибка анализа. Попробуйте позже.",
                     reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                        InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)
                     ]])
                 )
                 return
             
-            # Формируем сообщение
+            # Добавляем информацию о периоде
             text = analysis.to_detailed_report()
             
-            # Добавляем уведомление
-            if analysis.prediction in ["PUMP", "DUMP"]:
-                timeline_text = f"⏰ Уведомление через: *{analysis.pump_timeline_minutes} минут*"
-            else:
-                timeline_text = "⏰ Мониторинг продолжается"
+            # Добавляем информацию о периоде и уведомлении
+            notification_time = analysis.next_alert_at.strftime("%H:%M")
             
-            text += f"\n\n{timeline_text}"
+            text += f"\n\n━━━━━━━━━━━━━━━━━━━━━━━━"
+            text += f"\n⏱️ *Период анализа:* {period_names.get(period_minutes, str(period_minutes))}"
+            text += f"\n🔔 *Уведомление в:* {notification_time}"
             
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔄 ОБНОВИТЬ", callback_data=Actions.PREMIUM_SIGNAL)],
+                [InlineKeyboardButton("🔄 ДРУГАЯ МОНЕТА", callback_data=Actions.PREMIUM_SIGNAL)],
                 [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
             ])
             
