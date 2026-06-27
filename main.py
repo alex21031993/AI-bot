@@ -13,6 +13,13 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
+# Fix for Python 3.13+ event loop issue
+try:
+    import nest_asyncio
+    nest_asyncio.apply()
+except ImportError:
+    pass
+
 from dotenv import load_dotenv
 from loguru import logger
 
