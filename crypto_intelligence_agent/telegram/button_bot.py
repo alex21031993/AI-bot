@@ -14,6 +14,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Mess
 from ..database.manager import DatabaseManager
 from ..monitoring.monitor import BackgroundMonitor
 from ..scanner.market_scanner import MarketScanner
+from ..scanner.premium_analyzer import PremiumScanner
 from ..payment.tron_tracker import TronPaymentTracker, PaymentVerifier
 
 
@@ -96,6 +97,9 @@ class Actions:
     PAY_STANDARD = "pay_standard"
     PAY_PREMIUM = "pay_premium"
     PAY_CHECK = "pay_check"
+    
+    # Premium actions
+    PREMIUM_SIGNAL = "premium_signal"
 
 
 class ButtonBot:
@@ -126,6 +130,9 @@ class ButtonBot:
         self.payment_tracker: Optional[TronPaymentTracker] = None
         self.payment_verifier: Optional[PaymentVerifier] = None
         self.deposit_address: str = ""
+        
+        # Premium scanner
+        self.premium_scanner = PremiumScanner()
     
     async def initialize(self):
         """Initialize bot components"""
@@ -307,6 +314,9 @@ class ButtonBot:
         
         elif data == Actions.PAY_CHECK:
             await self._check_payment(query)
+        
+        elif data == Actions.PREMIUM_SIGNAL:
+            await self._show_premium_signal(query)
         
         elif data == Actions.SELECT_TOKEN:
             await self._show_token_selection(query, "analysis")
@@ -490,8 +500,9 @@ class ButtonBot:
             [InlineKeyboardButton("📊 ТОП-10", callback_data=Actions.SCAN_TOP_10)],
             [InlineKeyboardButton("📈 СИГНАЛЫ", callback_data=Actions.SCAN_SIGNALS)],
             [InlineKeyboardButton("🔄 ОБНОВИТЬ", callback_data=Actions.SCAN_REFRESH)],
+            [InlineKeyboardButton("💎 PREMIUM СИГНАЛ", callback_data=Actions.PREMIUM_SIGNAL)],
             [InlineKeyboardButton("🔔 Оповещения", callback_data=Actions.MENU_ALERTS)],
-            [InlineKeyboardButton("💎 Подписка", callback_data=Actions.MENU_SUBSCRIBE)],
+            [InlineKeyboardButton("💳 Подписка", callback_data=Actions.MENU_SUBSCRIBE)],
             [InlineKeyboardButton("👑 Админ", callback_data=Actions.ADMIN_ENTER)]
         ])
     
@@ -725,6 +736,96 @@ class ButtonBot:
             )
     
     # ============ PAYMENT METHODS ============
+    
+    async def _show_premium_signal(self, query):
+        """Показать Premium сигнал одной монеты дня"""
+        user_id = query.from_user.id
+        
+        await query.edit_message_text(
+            "💎 *PREMIUM АНАЛИЗ*\n\n⏳ Провожу глубокий анализ монеты дня..."
+        )
+        
+        try:
+            # Проверяем подписку
+            user = await self.db.get_user(user_id)
+            is_premium = user and (user.is_premium or 
+                (user.subscription_expires and user.subscription_expires > datetime.utcnow()))
+            
+            if not is_premium:
+                # Показываем превью обычного анализа
+                coins = await self.scanner.scan_market(50)
+                if coins:
+                    top_coin = coins[0]
+                    
+                    text = f"""🔒 *PREMIUM ДОСТУП*
+
+💎 Для просмотра полного анализа нужна подписка!
+
+━━━━━━━━━━━━━━━
+
+📊 *Превью монеты дня:*
+{top_coin.emoji} *{top_coin.symbol}*
+💰 ${top_coin.price:,.4f}
+📊 Балл: {top_coin.total_score:.0f}%
+
+━━━━━━━━━━━━━━━
+
+💎 *Что дает Premium:*
+• 1 монета дня с полным анализом
+• Прогноз пампа/дампа
+• Входные точки
+• Все источники данных
+• Уведомления за 15 минут до события
+
+💰 Стоимость: $14.99/месяц
+"""
+                    
+                    keyboard = InlineKeyboardMarkup([
+                        [InlineKeyboardButton("💎 КУПИТЬ PREMIUM", callback_data=Actions.PAY_PREMIUM)],
+                        [InlineKeyboardButton("📊 СМОТРЕТЬ ТОП-10", callback_data=Actions.SCAN_TOP_10)],
+                        [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+                    ])
+                    
+                    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+                return
+            
+            # Premium пользователь - показываем полный анализ
+            analysis = await self.premium_scanner.get_today_coin()
+            
+            if not analysis:
+                await query.edit_message_text(
+                    "❌ Ошибка анализа. Попробуйте позже.",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                    ]])
+                )
+                return
+            
+            # Формируем сообщение
+            text = analysis.to_detailed_report()
+            
+            # Добавляем уведомление
+            if analysis.prediction in ["PUMP", "DUMP"]:
+                timeline_text = f"⏰ Уведомление через: *{analysis.pump_timeline_minutes} минут*"
+            else:
+                timeline_text = "⏰ Мониторинг продолжается"
+            
+            text += f"\n\n{timeline_text}"
+            
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔄 ОБНОВИТЬ", callback_data=Actions.PREMIUM_SIGNAL)],
+                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+            ])
+            
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+            
+        except Exception as e:
+            await query.edit_message_text(
+                f"❌ Ошибка: {str(e)}",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                ]])
+            )
     
     async def _show_payment_form(self, query, plan: str):
         """Show payment form for subscription"""
@@ -1417,6 +1518,7 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
         if self.payment_tracker:
             await self.payment_tracker.stop_monitoring()
         await self.scanner.close()
+        await self.premium_scanner.close()
     
     def run(self):
         """Run the bot"""
