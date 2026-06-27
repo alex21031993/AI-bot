@@ -804,6 +804,7 @@ class ButtonBot:
                     reply_markup=InlineKeyboardMarkup([[
                         InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)
                     ]])
+                )
                 return
             
             # Check for payments
