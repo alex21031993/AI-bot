@@ -877,44 +877,6 @@ class ButtonBot:
         """Показать Premium глубокий анализ"""
         user_id = query.from_user.id
         
-        # Admin has unlimited access
-        if user_id in self.admin_ids:
-            await query.edit_message_text(
-                "💎 *PREMIUM ГЛУБОКИЙ АНАЛИЗ*\n"
-                "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-                "👋 Администратор - неограниченный доступ!\n\n"
-                "⏳ Запускаю глубокий анализ монеты..."
-            )
-            
-            try:
-                analysis = await self.premium_scanner.get_today_coin()
-                if analysis:
-                    text = analysis.to_detailed_report()
-                    text += f"\n\n━━━━━━━━━━━━━━━━━━━━━━━━"
-                    text += f"\n👑 *Администратор: анализ без ограничений*"
-                    
-                    keyboard = InlineKeyboardMarkup([
-                        [InlineKeyboardButton("🔄 ОБНОВИТЬ", callback_data=Actions.PREMIUM_DEEP)],
-                        [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
-                    ])
-                    
-                    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
-                else:
-                    await query.edit_message_text(
-                        "❌ Ошибка анализа. Попробуйте позже.",
-                        reply_markup=InlineKeyboardMarkup([[
-                            InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
-                        ]])
-                    )
-            except Exception as e:
-                await query.edit_message_text(
-                    f"❌ Ошибка: {str(e)}",
-                    reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
-                    ]])
-                )
-            return
-        
         # Check user access
         user = await self.db.get_user(user_id)
         user_trial_active = True
@@ -929,21 +891,22 @@ class ButtonBot:
         # Check subscription
         is_subscribed = user and user.subscription_expires and user.subscription_expires > datetime.utcnow()
         
-        # Check trial
-        if user_trial_active:
-            # Trial users get 3 free uses
-            if uses_remaining <= 0:
-                uses_remaining = 3  # Trial bonus
+        # Check trial - give 5 free uses during trial
+        if user_trial_active and uses_remaining <= 0:
+            uses_remaining = 5  # Trial bonus - 5 uses
+        
+        # Admin has unlimited access
+        is_admin = user_id in self.admin_ids
         
         # If no access - show payment
-        if uses_remaining <= 0 and not is_subscribed:
+        if uses_remaining <= 0 and not is_subscribed and not is_admin:
             text = """💎 *PREMIUM ГЛУБОКИЙ АНАЛИЗ*
 
 ━━━━━━━━━━━━━━━━━━━━━━━━
 
 🔒 Для доступа к глубокому анализу:
 
-📦 *10 использований - $1.99*
+📦 *5 использований - $1.99*
 • Полный анализ монеты
 • Китовый анализ
 • Прогноз пампа/дампа
@@ -958,24 +921,26 @@ class ButtonBot:
 """
             
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("💳 КУПИТЬ 10 АНАЛИЗОВ - $1.99", callback_data=Actions.PAY_PREMIUM_USES)],
+                [InlineKeyboardButton("💳 КУПИТЬ 5 АНАЛИЗОВ - $1.99", callback_data=Actions.PAY_PREMIUM_USES)],
                 [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
             ])
             
             await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
             return
         
-        # User has access - show analysis
+        # Show counter and start analysis
+        counter_text = "∞" if is_admin else str(uses_remaining)
+        
         await query.edit_message_text(
             "💎 *PREMIUM ГЛУБОКИЙ АНАЛИЗ*\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
-            f"📊 Осталось использований: *{uses_remaining}*\n\n"
-            "⏳ Запускаю глубокий анализ..."
+            f"📊 Осталось использований: *{counter_text}*\n\n"
+            "⏳ Запускаю глубокий анализ монеты..."
         )
         
         try:
-            # Decrement uses
-            if user:
+            # Decrement uses (not for admin)
+            if not is_admin and user:
                 await self.db.db.execute(
                     "UPDATE users SET premium_uses_remaining = premium_uses_remaining - 1 WHERE user_id = ?",
                     (user_id,)
@@ -986,7 +951,11 @@ class ButtonBot:
             if analysis:
                 text = analysis.to_detailed_report()
                 text += f"\n\n━━━━━━━━━━━━━━━━━━━━━━━━"
-                text += f"\n📊 Осталось использований: *{uses_remaining - 1}*"
+                
+                if is_admin:
+                    text += f"\n👑 *Администратор: ∞ использований*"
+                else:
+                    text += f"\n📊 Осталось использований: *{uses_remaining - 1}*"
                 
                 keyboard = InlineKeyboardMarkup([
                     [InlineKeyboardButton("🔄 ОБНОВИТЬ", callback_data=Actions.PREMIUM_DEEP)],
