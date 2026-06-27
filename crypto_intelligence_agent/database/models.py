@@ -55,6 +55,9 @@ class User:
     is_active: bool = True
     is_premium: bool = False
     
+    # Premium deep analysis uses (10 uses for $1.99)
+    premium_uses_remaining: int = 0
+    
     created_at: datetime = field(default_factory=datetime.utcnow)
     last_active: datetime = field(default_factory=datetime.utcnow)
     

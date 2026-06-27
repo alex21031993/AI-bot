@@ -107,6 +107,10 @@ class Actions:
     PERIOD_3H = "period_3h"
     PERIOD_24H = "period_24h"
     
+    # Premium deep analysis
+    PREMIUM_DEEP = "premium_deep"
+    PAY_PREMIUM_USES = "pay_premium_uses"
+    
     # Admin panel (for when admin is already authenticated)
     ADMIN_PANEL = "admin_panel"
 
@@ -344,6 +348,13 @@ class ButtonBot:
             await self._analyze_period(query, 1440)
         
         elif data == Actions.ADMIN_PANEL:
+            await self._show_premium_deep(query)
+        
+        elif data == Actions.PREMIUM_DEEP:
+            await self._show_premium_deep(query)
+
+        elif data == Actions.PAY_PREMIUM_USES:
+            await self._show_premium_uses_payment(query)
             await self._show_admin_panel(query)
         
         elif data == Actions.SELECT_TOKEN:
@@ -536,6 +547,7 @@ class ButtonBot:
                 [InlineKeyboardButton("📊 ТОП-10", callback_data=Actions.SCAN_TOP_10)],
                 [InlineKeyboardButton("📈 СИГНАЛЫ", callback_data=Actions.SCAN_SIGNALS)],
                 [InlineKeyboardButton("🔄 ОБНОВИТЬ", callback_data=Actions.SCAN_REFRESH)],
+                [InlineKeyboardButton("💎 PREMIUM АНАЛИЗ", callback_data=Actions.PREMIUM_DEEP)],
                 [InlineKeyboardButton("⏱️ АНАЛИЗ ПЕРИОДА", callback_data=Actions.PREMIUM_SIGNAL)],
                 [InlineKeyboardButton("🔔 Оповещения", callback_data=Actions.MENU_ALERTS)],
                 [InlineKeyboardButton("👑 АДМИН-ПАНЕЛЬ", callback_data=Actions.ADMIN_PANEL)],
@@ -554,6 +566,7 @@ class ButtonBot:
             [InlineKeyboardButton("📊 ТОП-10", callback_data=Actions.SCAN_TOP_10)],
             [InlineKeyboardButton("📈 СИГНАЛЫ", callback_data=Actions.SCAN_SIGNALS)],
             [InlineKeyboardButton("🔄 ОБНОВИТЬ", callback_data=Actions.SCAN_REFRESH)],
+            [InlineKeyboardButton("💎 PREMIUM АНАЛИЗ", callback_data=Actions.PREMIUM_DEEP)],
             [InlineKeyboardButton("⏱️ АНАЛИЗ ПЕРИОДА", callback_data=Actions.PREMIUM_SIGNAL)],
             [InlineKeyboardButton("🔔 Оповещения", callback_data=Actions.MENU_ALERTS)],
             [InlineKeyboardButton(f"⏰ {days_remaining} дней осталось", callback_data="noop")],
@@ -858,6 +871,189 @@ class ButtonBot:
             "💎 У вас полный доступ ко всем функциям!",
             parse_mode="Markdown",
             reply_markup=self._get_admin_keyboard()
+        )
+    
+    async def _show_premium_deep(self, query):
+        """Показать Premium глубокий анализ"""
+        user_id = query.from_user.id
+        
+        # Admin has unlimited access
+        if user_id in self.admin_ids:
+            await query.edit_message_text(
+                "💎 *PREMIUM ГЛУБОКИЙ АНАЛИЗ*\n"
+                "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+                "👋 Администратор - неограниченный доступ!\n\n"
+                "⏳ Запускаю глубокий анализ монеты..."
+            )
+            
+            try:
+                analysis = await self.premium_scanner.get_today_coin()
+                if analysis:
+                    text = analysis.to_detailed_report()
+                    text += f"\n\n━━━━━━━━━━━━━━━━━━━━━━━━"
+                    text += f"\n👑 *Администратор: анализ без ограничений*"
+                    
+                    keyboard = InlineKeyboardMarkup([
+                        [InlineKeyboardButton("🔄 ОБНОВИТЬ", callback_data=Actions.PREMIUM_DEEP)],
+                        [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+                    ])
+                    
+                    await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+                else:
+                    await query.edit_message_text(
+                        "❌ Ошибка анализа. Попробуйте позже.",
+                        reply_markup=InlineKeyboardMarkup([[
+                            InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                        ]])
+                    )
+            except Exception as e:
+                await query.edit_message_text(
+                    f"❌ Ошибка: {str(e)}",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                    ]])
+                )
+            return
+        
+        # Check user access
+        user = await self.db.get_user(user_id)
+        user_trial_active = True
+        if user and user.created_at:
+            from datetime import timedelta
+            trial_end = user.created_at + timedelta(days=3)
+            user_trial_active = datetime.utcnow() < trial_end
+        
+        # Check premium uses
+        uses_remaining = getattr(user, 'premium_uses_remaining', 0) if user else 0
+        
+        # Check subscription
+        is_subscribed = user and user.subscription_expires and user.subscription_expires > datetime.utcnow()
+        
+        # Check trial
+        if user_trial_active:
+            # Trial users get 3 free uses
+            if uses_remaining <= 0:
+                uses_remaining = 3  # Trial bonus
+        
+        # If no access - show payment
+        if uses_remaining <= 0 and not is_subscribed:
+            text = """💎 *PREMIUM ГЛУБОКИЙ АНАЛИЗ*
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+🔒 Для доступа к глубокому анализу:
+
+📦 *10 использований - $1.99*
+• Полный анализ монеты
+• Китовый анализ
+• Прогноз пампа/дампа
+• Входные точки
+• Уведомления 24/7
+
+💡 Анализ включает:
+• Данные с 10+ источников
+• Социальные метрики
+• Он-чейн данные
+• Объёмы торгов
+"""
+            
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("💳 КУПИТЬ 10 АНАЛИЗОВ - $1.99", callback_data=Actions.PAY_PREMIUM_USES)],
+                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+            ])
+            
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+            return
+        
+        # User has access - show analysis
+        await query.edit_message_text(
+            "💎 *PREMIUM ГЛУБОКИЙ АНАЛИЗ*\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+            f"📊 Осталось использований: *{uses_remaining}*\n\n"
+            "⏳ Запускаю глубокий анализ..."
+        )
+        
+        try:
+            # Decrement uses
+            if user:
+                await self.db.db.execute(
+                    "UPDATE users SET premium_uses_remaining = premium_uses_remaining - 1 WHERE user_id = ?",
+                    (user_id,)
+                )
+                await self.db.db.commit()
+            
+            analysis = await self.premium_scanner.get_today_coin()
+            if analysis:
+                text = analysis.to_detailed_report()
+                text += f"\n\n━━━━━━━━━━━━━━━━━━━━━━━━"
+                text += f"\n📊 Осталось использований: *{uses_remaining - 1}*"
+                
+                keyboard = InlineKeyboardMarkup([
+                    [InlineKeyboardButton("🔄 ОБНОВИТЬ", callback_data=Actions.PREMIUM_DEEP)],
+                    [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+                ])
+                
+                await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+            else:
+                await query.edit_message_text(
+                    "❌ Ошибка анализа. Попробуйте позже.",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                    ]])
+                )
+        except Exception as e:
+            await query.edit_message_text(
+                f"❌ Ошибка: {str(e)}",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                ]])
+            )
+    
+    async def _show_premium_uses_payment(self, query):
+        """Показать форму оплаты Premium использований"""
+        user_id = query.from_user.id
+        
+        text = """💳 *ПОКУПКА PREMIUM АНАЛИЗОВ*
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+📦 *10 глубоких анализов*
+
+💰 Цена: *$1.99*
+
+✅ *Что входит:*
+• Полный анализ монеты
+• Китовый анализ
+• Прогноз пампа/дампа
+• Входные точки (TP/SL)
+• Уведомления 24/7
+
+━━━━━━━━━━━━━━━
+
+💵 *Оплата USDT (TRC20):*
+
+📬 Адрес:
+`TCSYEiTBp67GvUk3f2f1foL1jdRKu6upD8`
+
+━━━━━━━━━━━━━━━
+
+⚠️ Минимальная сумма: 1 USDT
+⏱️ Оплата проверяется автоматически
+
+📝 После оплаты напишите свой Telegram ID: `{user_id}`
+
+💡 Или отправьте скриншот оплаты администратору
+"""
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔄 ПРОВЕРИТЬ ОПЛАТУ", callback_data=Actions.PAY_CHECK)],
+            [InlineKeyboardButton("🔙 Отмена", callback_data=Actions.MENU_MAIN)]
+        ])
+        
+        await query.edit_message_text(
+            text.format(user_id=user_id),
+            parse_mode="Markdown",
+            reply_markup=keyboard
         )
     
     async def _show_premium_signal(self, query):
