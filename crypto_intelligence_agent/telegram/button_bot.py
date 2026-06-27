@@ -13,6 +13,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Mess
 
 from ..database.manager import DatabaseManager
 from ..monitoring.monitor import BackgroundMonitor
+from ..scanner.market_scanner import MarketScanner
 
 
 # ============ CONSTANTS ============
@@ -77,6 +78,13 @@ class Actions:
     TOKEN_REMOVE = "rem_"
     TOKEN_ALERT_ABOVE = "alab_"
     TOKEN_ALERT_BELOW = "albe_"
+    
+    # Scanner actions
+    SCAN_BUY_SIGNALS = "scan_buy"
+    SCAN_TOP_10 = "scan_top10"
+    SCAN_SIGNALS = "scan_signals"
+    SCAN_REFRESH = "scan_refresh"
+    SCAN_COIN_DETAIL = "scan_detail_"
 
 
 class ButtonBot:
@@ -91,6 +99,7 @@ class ButtonBot:
         
         self.db = DatabaseManager()
         self.monitor: Optional[BackgroundMonitor] = None
+        self.scanner = MarketScanner()  # Автоматический поиск монет
         
         # Track user states
         self.user_states: Dict[int, str] = {}  # user_id -> current_state
@@ -168,6 +177,22 @@ class ButtonBot:
         
         elif data == Actions.MENU_ANALYSIS:
             await self._show_analysis_menu(query)
+        
+        elif data == Actions.SCAN_BUY_SIGNALS:
+            await self._show_buy_signals(query)
+        
+        elif data == Actions.SCAN_TOP_10:
+            await self._show_top_10(query)
+        
+        elif data == Actions.SCAN_SIGNALS:
+            await self._show_all_signals(query)
+        
+        elif data == Actions.SCAN_REFRESH:
+            await self._refresh_scan(query)
+        
+        elif data.startswith(Actions.SCAN_COIN_DETAIL):
+            coin_symbol = data.replace(Actions.SCAN_COIN_DETAIL, "")
+            await self._show_coin_detail(query, coin_symbol)
         
         elif data == Actions.SELECT_TOKEN:
             await self._show_token_selection(query, "analysis")
@@ -338,21 +363,21 @@ class ButtonBot:
     def _get_main_menu_text(self) -> str:
         return """🐋 *Crypto Intelligence Bot*
 
-📊 Анализ криптовалют с ИИ
-🟢🟡🔴 Автоматические сигналы
-🔔 Круглосуточный мониторинг
+🤖 Бот АВТОМАТИЧЕСКИ находит лучшие монеты
+📊 Сканирует рынок каждые 15 минут
+🟢 Находит монеты с высоким потенциалом роста
 
 ━━━━━━━━━━━━━━━
 👇 Выберите действие:"""
 
     def _get_main_menu_keyboard(self) -> InlineKeyboardMarkup:
         return InlineKeyboardMarkup([
-            [InlineKeyboardButton("📊 Анализ", callback_data=Actions.MENU_ANALYSIS)],
-            [InlineKeyboardButton("👁️ Мой портфель", callback_data=Actions.MENU_WATCHLIST)],
-            [InlineKeyboardButton("📈 Сигналы", callback_data=Actions.MENU_SIGNALS)],
+            [InlineKeyboardButton("🔍 НАЙТИ МОНЕТЫ", callback_data=Actions.SCAN_BUY_SIGNALS)],
+            [InlineKeyboardButton("📊 ТОП-10", callback_data=Actions.SCAN_TOP_10)],
+            [InlineKeyboardButton("📈 СИГНАЛЫ", callback_data=Actions.SCAN_SIGNALS)],
+            [InlineKeyboardButton("🔄 ОБНОВИТЬ", callback_data=Actions.SCAN_REFRESH)],
             [InlineKeyboardButton("🔔 Оповещения", callback_data=Actions.MENU_ALERTS)],
             [InlineKeyboardButton("💎 Подписка", callback_data=Actions.MENU_SUBSCRIBE)],
-            [InlineKeyboardButton("⚙️ Настройки", callback_data=Actions.MENU_SETTINGS)],
             [InlineKeyboardButton("👑 Админ", callback_data=Actions.ADMIN_ENTER)]
         ])
     
@@ -363,6 +388,227 @@ class ButtonBot:
             parse_mode="Markdown",
             reply_markup=self._get_main_menu_keyboard()
         )
+    
+    # ============ SCANNER METHODS ============
+    
+    async def _show_buy_signals(self, query):
+        """Показать монеты с сигналом BUY"""
+        await query.edit_message_text("🔍 *Сканирую рынок...*\n\nНахожу монеты с сигналом 🟢 BUY")
+        
+        try:
+            coins = await self.scanner.scan_market(100)
+            buy_coins = [c for c in coins if c.recommendation == "BUY"][:10]
+            
+            if not buy_coins:
+                text = """🟡 *Нет сигналов BUY*
+
+Система не нашла монет с явным сигналом на покупку.
+
+Нажмите "Обновить" для повторного сканирования."""
+            else:
+                text = f"""🟢 *Монеты с сигналом BUY*
+
+Найдено: {len(buy_coins)} монет
+Время сканирования: {datetime.utcnow().strftime('%H:%M:%S')}
+
+"""
+                for coin in buy_coins:
+                    text += f"{coin.emoji} *{coin.symbol}*\n"
+                    text += f"   💰 ${coin.price:,.4f}\n"
+                    text += f"   📈 {coin.price_change_24h:+.1f}% | 📊 {coin.total_score:.0f}%\n\n"
+            
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔄 Обновить", callback_data=Actions.SCAN_REFRESH)],
+                [InlineKeyboardButton("📊 ТОП-10", callback_data=Actions.SCAN_TOP_10)],
+                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+            ])
+            
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+            
+        except Exception as e:
+            await query.edit_message_text(
+                f"❌ Ошибка сканирования: {str(e)}",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                ]])
+            )
+    
+    async def _show_top_10(self, query):
+        """Показать топ-10 монет по баллам"""
+        await query.edit_message_text("📊 *Сканирую рынок...*\n\nАнализирую топ-100 монет")
+        
+        try:
+            coins = await self.scanner.scan_market(100)
+            top_coins = coins[:10]
+            
+            text = f"""📊 *ТОП-10 монет по потенциалу*
+
+Рейтинг составлен на основе:
+• Объем торгов
+• Динамика цены
+• Настроения рынка
+• Активность китов
+
+🕐 Обновлено: {datetime.utcnow().strftime('%H:%M:%S')}
+
+"""
+            
+            for i, coin in enumerate(top_coins, 1):
+                emoji = coin.emoji
+                text += f"{i}. {emoji} *{coin.symbol}*\n"
+                text += f"   💰 ${coin.price:,.4f}\n"
+                text += f"   📊 Балл: {coin.total_score:.0f}/100 | 📈 {coin.price_change_24h:+.1f}%\n"
+                text += f"   💡 {coin.rationale[0] if coin.rationale else 'Хороший выбор'}\n\n"
+            
+            # Add coins as buttons for details
+            keyboard_buttons = []
+            row = []
+            for coin in top_coins[:5]:
+                row.append(InlineKeyboardButton(f"{coin.emoji} {coin.symbol}", callback_data=f"{Actions.SCAN_COIN_DETAIL}{coin.symbol}"))
+                if len(row) == 2:
+                    keyboard_buttons.append(row)
+                    row = []
+            if row:
+                keyboard_buttons.append(row)
+            
+            keyboard_buttons.append([InlineKeyboardButton("🔄 Обновить", callback_data=Actions.SCAN_REFRESH)])
+            keyboard_buttons.append([InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)])
+            
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard_buttons))
+            
+        except Exception as e:
+            await query.edit_message_text(
+                f"❌ Ошибка: {str(e)}",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                ]])
+            )
+    
+    async def _show_all_signals(self, query):
+        """Показать все сигналы"""
+        await query.edit_message_text("📈 *Анализирую сигналы...*")
+        
+        try:
+            coins = await self.scanner.scan_market(50)
+            
+            buy = [c for c in coins if c.recommendation == "BUY"]
+            hold = [c for c in coins if c.recommendation == "HOLD"]
+            sell = [c for c in coins if c.recommendation == "SELL"]
+            
+            text = f"""📈 *Сводка по сигналам*
+
+🟢 BUY: {len(buy)} монет
+🟡 HOLD: {len(hold)} монет
+🔴 SELL: {len(sell)} монет
+
+━━━━━━━━━━━━━━━
+
+🟢 *Сигналы на ПОКУПКУ:*
+"""
+            for coin in buy[:3]:
+                text += f"• {coin.symbol}: {coin.total_score:.0f}%\n"
+            
+            if not buy:
+                text += "Нет\n"
+            
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🟢 BUY", callback_data=Actions.SCAN_BUY_SIGNALS)],
+                [InlineKeyboardButton("🔴 SELL", callback_data="show_sell")],
+                [InlineKeyboardButton("🔄 Обновить", callback_data=Actions.SCAN_REFRESH)],
+                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+            ])
+            
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+            
+        except Exception as e:
+            await query.edit_message_text(
+                f"❌ Ошибка: {str(e)}",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                ]])
+            )
+    
+    async def _refresh_scan(self, query):
+        """Обновить сканирование"""
+        await query.edit_message_text("🔄 *Обновляю данные...*\n\nСканирую рынок заново")
+        
+        try:
+            coins = await self.scanner.scan_market(100)
+            
+            buy = len([c for c in coins if c.recommendation == "BUY"])
+            
+            text = f"""✅ *Данные обновлены!*
+
+📊 Просканировано: {len(coins)} монет
+🟢 Сигналов BUY: {buy}
+
+🕐 Время: {datetime.utcnow().strftime('%H:%M:%S')}
+"""
+            
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔍 НАЙТИ МОНЕТЫ", callback_data=Actions.SCAN_BUY_SIGNALS)],
+                [InlineKeyboardButton("📊 ТОП-10", callback_data=Actions.SCAN_TOP_10)],
+                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+            ])
+            
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+            
+        except Exception as e:
+            await query.edit_message_text(
+                f"❌ Ошибка: {str(e)}",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                ]])
+            )
+    
+    async def _show_coin_detail(self, query, symbol: str):
+        """Показать детали монеты"""
+        await query.edit_message_text(f"📊 *Загружаю {symbol}...*")
+        
+        try:
+            coins = self.scanner.get_top_coins(100)
+            coin = next((c for c in coins if c.symbol == symbol), None)
+            
+            if not coin:
+                await query.edit_message_text(
+                    "❌ Монета не найдена. Обновите данные.",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🔄 Обновить", callback_data=Actions.SCAN_REFRESH),
+                        InlineKeyboardButton("🔙 Назад", callback_data=Actions.SCAN_TOP_10)
+                    ]])
+                )
+                return
+            
+            text = coin.to_full_card()
+            
+            # Calculate trading levels
+            entry = coin.price
+            stop_loss = coin.price * 0.95
+            take_profit = coin.price * 1.25 if coin.total_score > 70 else coin.price * 1.15
+            
+            text += f"\n━━━━━━━━━━━━━━━\n"
+            text += f"📐 *Торговые уровни:*\n"
+            text += f"• Вход: ${entry:,.6f}\n"
+            text += f"• TP: ${take_profit:,.6f} (+{((take_profit/entry)-1)*100:.1f}%)\n"
+            text += f"• SL: ${stop_loss:,.6f} ({((stop_loss/entry)-1)*100:.1f}%)\n"
+            
+            text += f"\n⚠️ Не является финансовой рекомендацией!"
+            
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("👁️ Добавить в отслеживание", callback_data=f"track_{symbol}")],
+                [InlineKeyboardButton("🔄 Другие монеты", callback_data=Actions.SCAN_TOP_10)],
+                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+            ])
+            
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+            
+        except Exception as e:
+            await query.edit_message_text(
+                f"❌ Ошибка: {str(e)}",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                ]])
+            )
     
     # ============ ANALYSIS METHODS ============
     
@@ -874,6 +1120,7 @@ class ButtonBot:
         """Stop background monitoring"""
         if self.monitor:
             await self.monitor.stop()
+        await self.scanner.close()
     
     def run(self):
         """Run the bot"""
