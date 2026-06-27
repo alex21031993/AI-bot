@@ -113,7 +113,7 @@ class BackgroundMonitor:
                     if result.success:
                         rec_data = result.data.get("recommendation", {})
                         recommendation = rec_data.get("action", "WAIT")
-                        confidence = rec_data.get("confidence", 0)
+                        confidence = rec_data.get("confidence") or 0
                         current_price = result.data.get("price")
                         
                         # Update token
@@ -167,7 +167,7 @@ class BackgroundMonitor:
         try:
             rec_data = analysis_data.get("recommendation", {})
             recommendation = rec_data.get("action", "WAIT")
-            confidence = rec_data.get("confidence", 0)
+            confidence = rec_data.get("confidence") or 0
             rationale = rec_data.get("rationale", [])
             current_price = analysis_data.get("price", 0)
             
@@ -181,11 +181,11 @@ class BackgroundMonitor:
 
 {e} *{recommendation}* — {token.token_symbol}
 
-💰 Текущая цена: ${current_price:,.6f}
+💰 Текущая цена: {price_str}
 📈 Уверенность: {confidence:.0f}%
 
 📐 *Торговые уровни:*
-• Вход: ${current_price:,.6f}
+• Вход: {price_str}
 • 📈 TP: ${take_profit:,.6f} (+{((take_profit/current_price)-1)*100:.1f}% если достижимо)
 • 🛑 SL: ${stop_loss:,.6f}
 
@@ -260,17 +260,18 @@ class BackgroundMonitor:
         scores = data.get("scores", {})
         rec_data = data.get("recommendation", {})
         recommendation = rec_data.get("action", "WAIT")
-        confidence = rec_data.get("confidence", 0)
+        confidence = rec_data.get("confidence") or 0
         
         emoji = {"BUY": "🟢", "SELL": "🔴", "HOLD": "🟡", "WAIT": "⚪"}
         e = emoji.get(recommendation, "⚪")
         
-        current_price = data.get("price", 0)
+        current_price = data.get("price")
+        price_str = f"{price_str}" if current_price else "N/A"
         
         lines = [
             f"📊 *Анализ: {symbol}*\n",
             f"{e} *РЕКОМЕНДАЦИЯ: {recommendation}* ({confidence:.0f}%)\n",
-            f"💰 Цена: ${current_price:,.6f}\n",
+            f"💰 Цена: {price_str}\n",
             f"\n📊 *Оценки:*",
             f"• AI Score: {scores.get('total', 0):.1f}%",
             f"• Whale Score: {scores.get('whale_score', 0):.1f}%",
@@ -289,7 +290,7 @@ class BackgroundMonitor:
             sl = current_price * 0.95
             lines.extend([
                 f"\n📐 *Уровни:*",
-                f"• Entry: ${current_price:,.6f}",
+                f"• Entry: {price_str}",
                 f"• TP: ${tp:,.6f} (+{((tp/current_price)-1)*100:.1f}%)",
                 f"• SL: ${sl:,.6f} ({((sl/current_price)-1)*100:.1f}%)"
             ])
