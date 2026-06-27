@@ -161,7 +161,12 @@ class WhaleAnalyzer:
             }
     
     async def _get_whale_alert_transactions(self, token: str) -> Dict[str, Any]:
-        """Get whale transactions from Whale Alert API"""
+        """Get whale transactions from Whale Alert API
+        
+        Note: Whale Alert API requires a paid API key.
+        Without a key, simulated data is used for demo purposes.
+        CoinGecko and Reddit APIs work FREE without keys.
+        """
         try:
             if not self.whale_alert_key:
                 # Demo mode - return simulated data
