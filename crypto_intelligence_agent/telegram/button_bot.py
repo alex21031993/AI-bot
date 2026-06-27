@@ -893,7 +893,7 @@ class ButtonBot:
         
         # Check trial - give 5 free uses during trial
         if user_trial_active and uses_remaining <= 0:
-            uses_remaining = 5  # Trial bonus - 5 uses
+            uses_remaining = 5  # Trial: 5 free, Purchase: 10
         
         # Admin has unlimited access
         is_admin = user_id in self.admin_ids
@@ -906,7 +906,7 @@ class ButtonBot:
 
 🔒 Для доступа к глубокому анализу:
 
-📦 *5 использований - $1.99*
+📦 *10 использований - $1.99*
 • Полный анализ монеты
 • Китовый анализ
 • Прогноз пампа/дампа
@@ -921,7 +921,7 @@ class ButtonBot:
 """
             
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("💳 КУПИТЬ 5 АНАЛИЗОВ - $1.99", callback_data=Actions.PAY_PREMIUM_USES)],
+                [InlineKeyboardButton("💳 КУПИТЬ 10 АНАЛИЗОВ - $1.99", callback_data=Actions.PAY_PREMIUM_USES)],
                 [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
             ])
             
@@ -1298,12 +1298,23 @@ class ButtonBot:
                     expires = datetime.utcnow() + timedelta(days=days)
                     await self.db.update_user(user_id, is_premium=True, subscription_expires=expires)
                     
+                    # Add 10 premium uses for deep analysis
+                    await self.db.db.execute(
+                        "UPDATE users SET premium_uses_remaining = 10 WHERE user_id = ?",
+                        (user_id,)
+                    )
+                    await self.db.db.commit()
+                    
                     text = f"""✅ *ОПЛАТА ПОДТВЕРЖДЕНА!*
 
 💰 Получено: {amount} USDT
 📋 План: {plan.upper()}
 📅 Период: {days} дней
 📅 Истекает: {expires.strftime('%d.%m.%Y')}
+
+━━━━━━━━━━━━━━━
+🎁 *БОНУС:*
+📊 +10 глубоких анализов PREMIUM
 
 ━━━━━━━━━━━━━━━
 TxID: `{tx.get('tx_id', '')[:20]}...`
