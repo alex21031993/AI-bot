@@ -348,14 +348,14 @@ class ButtonBot:
             await self._analyze_period(query, 1440)
         
         elif data == Actions.ADMIN_PANEL:
-            await self._show_premium_deep(query)
+            await self._show_admin_panel(query)
+        
         
         elif data == Actions.PREMIUM_DEEP:
             await self._show_premium_deep(query)
 
         elif data == Actions.PAY_PREMIUM_USES:
             await self._show_premium_uses_payment(query)
-            await self._show_admin_panel(query)
         
         elif data == Actions.SELECT_TOKEN:
             await self._show_token_selection(query, "analysis")
