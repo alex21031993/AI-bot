@@ -14,6 +14,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Mess
 from ..database.manager import DatabaseManager
 from ..monitoring.monitor import BackgroundMonitor
 from ..scanner.market_scanner import MarketScanner
+from ..payment.tron_tracker import TronPaymentTracker, PaymentVerifier
 
 
 # ============ CONSTANTS ============
@@ -89,6 +90,12 @@ class Actions:
     SCAN_SIGNALS = "scan_signals"
     SCAN_REFRESH = "scan_refresh"
     SCAN_COIN_DETAIL = "scan_detail_"
+    
+    # Payment actions
+    PAY_TRIAL = "pay_trial"
+    PAY_STANDARD = "pay_standard"
+    PAY_PREMIUM = "pay_premium"
+    PAY_CHECK = "pay_check"
 
 
 class ButtonBot:
@@ -114,10 +121,37 @@ class ButtonBot:
         # User daily limits (for free trial)
         self.user_requests: Dict[int, int] = {}  # user_id -> requests_today
         self.last_request_date: Dict[int, str] = {}  # user_id -> date string
+        
+        # Payment tracker
+        self.payment_tracker: Optional[TronPaymentTracker] = None
+        self.payment_verifier: Optional[PaymentVerifier] = None
+        self.deposit_address: str = ""
     
     async def initialize(self):
         """Initialize bot components"""
         await self.db.initialize()
+        
+        # Initialize payment tracker
+        from dotenv import load_dotenv
+        import os
+        load_dotenv()
+        
+        usdt_contract = os.getenv("USDT_CONTRACT_TRC20", "TR7NHqjeKQxGTCi8q8REbdNKR2AfZ7Tn7")
+        self.deposit_address = os.getenv("TRON_DEPOSIT_ADDRESS", "")
+        min_confirmations = int(os.getenv("MIN_CONFIRMATIONS", "6"))
+        
+        self.payment_tracker = TronPaymentTracker(
+            usdt_contract=usdt_contract,
+            min_confirmations=min_confirmations,
+            check_interval=30
+        )
+        
+        self.payment_verifier = PaymentVerifier(
+            tracker=self.payment_tracker,
+            db=self.db
+        )
+        
+        await self.payment_tracker.start_monitoring()
         
         self.monitor = BackgroundMonitor(
             db=self.db,
@@ -260,6 +294,19 @@ class ButtonBot:
         elif data.startswith(Actions.SCAN_COIN_DETAIL):
             coin_symbol = data.replace(Actions.SCAN_COIN_DETAIL, "")
             await self._show_coin_detail(query, coin_symbol)
+        
+        # Payment handlers
+        elif data == Actions.PAY_TRIAL:
+            await self._show_payment_form(query, "trial")
+        
+        elif data == Actions.PAY_STANDARD:
+            await self._show_payment_form(query, "standard")
+        
+        elif data == Actions.PAY_PREMIUM:
+            await self._show_payment_form(query, "premium")
+        
+        elif data == Actions.PAY_CHECK:
+            await self._check_payment(query)
         
         elif data == Actions.SELECT_TOKEN:
             await self._show_token_selection(query, "analysis")
@@ -677,6 +724,164 @@ class ButtonBot:
                 ]])
             )
     
+    # ============ PAYMENT METHODS ============
+    
+    async def _show_payment_form(self, query, plan: str):
+        """Show payment form for subscription"""
+        user_id = query.from_user.id
+        
+        plan_info = {
+            "trial": ("🎁 TRIAL", "5 дней", "$2.99"),
+            "standard": ("⭐ STANDARD", "7 дней", "$4.99"),
+            "premium": ("💎 PREMIUM", "30 дней", "$14.99")
+        }
+        
+        name, days, price = plan_info.get(plan, ("❓", "?", "?"))
+        
+        # Create payment
+        address = self.deposit_address
+        
+        if not address:
+            await query.edit_message_text(
+                "❌ *Ошибка оплаты*\n\nАдрес для оплаты не настроен. Обратитесь к администратору.",
+                parse_mode="Markdown"
+            )
+            return
+        
+        text = f"""💳 *Оплата подписки*
+
+{name}
+━━━━━━━━━━━━━━━
+📅 Срок: {days}
+💰 Цена: {price} USDT
+
+━━━━━━━━━━━━━━━
+
+📋 *Инструкция:*
+
+1️⃣ Скопируйте адрес ниже
+2️⃣ Отправьте {price} USDT (TRC20)
+3️⃣ Нажмите "Проверить оплату"
+
+━━━━━━━━━━━━━━━
+
+🏦 *Адрес для оплаты:*
+`{address}`
+
+⚠️ *Внимание:*
+• Только сеть TRON (TRC20)
+• Только USDT токен
+• Минимум 6 подтверждений (~30 сек)
+
+━━━━━━━━━━━━━━━
+
+💡 После оплаты нажмите кнопку "Проверить оплату"
+"""
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔍 Проверить оплату", callback_data=Actions.PAY_CHECK)],
+            [InlineKeyboardButton("💎 Другие планы", callback_data=Actions.MENU_SUBSCRIBE)],
+            [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+        ])
+        
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+    
+    async def _check_payment(self, query):
+        """Check if payment was received"""
+        user_id = query.from_user.id
+        
+        await query.edit_message_text("🔍 *Проверяю оплату...*\n\nПодключение к блокчейну TRON...")
+        
+        try:
+            # Get user's pending payment
+            # For simplicity, we'll use the shared deposit address
+            # In production, you'd generate unique addresses per user
+            address = self.deposit_address
+            
+            if not address:
+                await query.edit_message_text(
+                    "❌ Адрес не настроен",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)
+                    ]])
+                return
+            
+            # Check for payments
+            txs = await self.payment_tracker.check_address_transactions(address)
+            
+            if not txs:
+                text = """🔍 *Оплата не найдена*
+
+⏳ Платеж обычно поступает в течение 1-2 минут
+
+💡 *Проверьте:*
+• Отправили ли вы USDT (не другую монету)
+• Использовали ли сеть TRON (TRC20)
+• Хватило ли подтверждений (обычно ~30 сек)
+
+━━━━━━━━━━━━━━━
+Попробуйте проверить через минуту.
+"""
+            else:
+                # Payment found!
+                tx = txs[0]
+                amount = tx.get("amount", 0)
+                
+                # Activate subscription based on amount
+                from datetime import timedelta
+                
+                if amount >= 14.99:
+                    plan = "premium"
+                    days = 30
+                elif amount >= 4.99:
+                    plan = "standard"
+                    days = 7
+                elif amount >= 2.99:
+                    plan = "trial"
+                    days = 5
+                else:
+                    plan = "unknown"
+                    days = 0
+                
+                if days > 0:
+                    expires = datetime.utcnow() + timedelta(days=days)
+                    await self.db.update_user(user_id, is_premium=True, subscription_expires=expires)
+                    
+                    text = f"""✅ *ОПЛАТА ПОДТВЕРЖДЕНА!*
+
+💰 Получено: {amount} USDT
+📋 План: {plan.upper()}
+📅 Период: {days} дней
+📅 Истекает: {expires.strftime('%d.%m.%Y')}
+
+━━━━━━━━━━━━━━━
+TxID: `{tx.get('tx_id', '')[:20]}...`
+
+🎉 *Ваша подписка активирована!*
+"""
+                else:
+                    text = f"""⚠️ *Сумма не соответствует*
+
+💰 Получено: {amount} USDT
+💵 Ожидалось: 2.99 / 4.99 / 14.99 USDT
+
+Свяжитесь с администратором.
+"""
+            
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+            ])
+            
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+            
+        except Exception as e:
+            await query.edit_message_text(
+                f"❌ Ошибка проверки: {str(e)}",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)
+                ]])
+            )
+    
     # ============ ANALYSIS METHODS ============
     
     async def _show_analysis_menu(self, query):
@@ -997,14 +1202,35 @@ class ButtonBot:
         user_id = query.from_user.id
         self.user_states[user_id] = Actions.MENU_SUBSCRIBE
         
-        text = """💎 *Подписки*
+        text = """💎 *Тарифы подписки*
 
-Выберите план подписки:"""
+Выберите план для оплаты USDT (TRC20):
+
+━━━━━━━━━━━━━━━
+
+🎁 *TRIAL* — $2.99
+   • 5 дней доступа
+   • Все функции
+
+⭐ *STANDARD* — $4.99
+   • 7 дней доступа
+   • Все функции
+   • Приоритетная поддержка
+
+💎 *PREMIUM* — $14.99
+   • 30 дней доступа
+   • Все функции
+   • VIP поддержка
+   • Ранний доступ к сигналам
+
+━━━━━━━━━━━━━━━
+
+💳 Оплата через USDT TRC20"""
         
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🎁 TRIAL — 5 дней ($2.99)", callback_data=Actions.SUB_TRIAL)],
-            [InlineKeyboardButton("⭐ STANDARD — 7 дней ($4.99)", callback_data=Actions.SUB_STANDARD)],
-            [InlineKeyboardButton("💎 PREMIUM — 30 дней ($14.99)", callback_data=Actions.SUB_PREMIUM)],
+            [InlineKeyboardButton("🎁 TRIAL — $2.99", callback_data=Actions.PAY_TRIAL)],
+            [InlineKeyboardButton("⭐ STANDARD — $4.99", callback_data=Actions.PAY_STANDARD)],
+            [InlineKeyboardButton("💎 PREMIUM — $14.99", callback_data=Actions.PAY_PREMIUM)],
             [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
         ])
         
@@ -1187,6 +1413,8 @@ class ButtonBot:
         """Stop background monitoring"""
         if self.monitor:
             await self.monitor.stop()
+        if self.payment_tracker:
+            await self.payment_tracker.stop_monitoring()
         await self.scanner.close()
     
     def run(self):
