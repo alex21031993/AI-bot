@@ -341,12 +341,15 @@ class ButtonBot:
         data = query.data
         
         # Handle based on current state and action
-        if data == Actions.MENU_MAIN or data == Actions.MENU_BACK:
+        if data == Actions.MENU_MAIN:
             user_id = query.from_user.id
             if user_id in self.admin_ids:
                 await self._show_admin_main_menu(query)
             else:
                 await self._show_main_menu(query)
+        elif data == Actions.MENU_BACK:
+            # Всегда показывать главное меню (не админку)
+            await self._show_main_menu(query)
         elif data == Actions.ADMIN_MAIN:
             await self._show_admin_main_menu(query)
         
