@@ -87,7 +87,7 @@ class Actions:
     ADMIN_ENTER = "admin_enter"
     ADMIN_PASSWORD = "admin_password"
     ADMIN_VERIFY = "admin_verify"
-    ADMIN_MENU = "admin_menu"
+    ADMIN_MAIN = "admin_menu"
     ADMIN_STATS = "admin_stats"
     ADMIN_BROADCAST = "admin_broadcast"
     ADMIN_USERS = "admin_users"
@@ -489,7 +489,7 @@ class ButtonBot:
         elif data == Actions.ADMIN_ENTER:
             await self._request_admin_password(query)
         
-        elif data == Actions.ADMIN_MENU:
+        elif data == Actions.ADMIN_MAIN:
             await self._show_admin_menu(query)
         
         elif data == Actions.ADMIN_STATS:
@@ -543,7 +543,7 @@ class ButtonBot:
                         parse_mode="Markdown",
                         reply_markup=self._get_full_admin_menu_keyboard()
                     )
-                    self.user_states[user_id] = Actions.ADMIN_MENU
+                    self.user_states[user_id] = Actions.ADMIN_MAIN
                 else:
                     attempts = self.admin_attempts.get(user_id, 0) + 1
                     self.admin_attempts[user_id] = attempts
@@ -568,10 +568,10 @@ class ButtonBot:
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("✅ Отправить", callback_data="confirm_broadcast")],
-                    [InlineKeyboardButton("❌ Отмена", callback_data=Actions.ADMIN_MENU)]
+                    [InlineKeyboardButton("❌ Отмена", callback_data=Actions.ADMIN_MAIN)]
                 ])
             )
-            self.user_states[user_id] = Actions.ADMIN_MENU
+            self.user_states[user_id] = Actions.ADMIN_MAIN
             return
         
         # Check if user is entering alert price
@@ -2164,10 +2164,11 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
     
     async def _show_admin_menu(self, query):
         """Show admin menu"""
-        await query.edit_message_text(
+        await self._safe_edit_message(
+            query,
             "👑 *Админ-панель*\n\nВыберите действие:",
             parse_mode="Markdown",
-            reply_markup=self._get_admin_keyboard()
+            reply_markup=self._get_full_admin_menu_keyboard()
         )
     
     async def _show_admin_stats(self, query):
@@ -2184,7 +2185,7 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
 🕐 {datetime.utcnow().strftime('%H:%M:%S %d.%m.%Y')}"""
         
         keyboard = InlineKeyboardMarkup([[
-            InlineKeyboardButton("🔙 К админ-панели", callback_data=Actions.ADMIN_MENU)
+            InlineKeyboardButton("🔙 К админ-панели", callback_data=Actions.ADMIN_MAIN)
         ]])
         
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -2200,7 +2201,7 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
 📋 Действия с пользователями будут доступны в следующих версиях."""
         
         keyboard = InlineKeyboardMarkup([[
-            InlineKeyboardButton("🔙 К админ-панели", callback_data=Actions.ADMIN_MENU)
+            InlineKeyboardButton("🔙 К админ-панели", callback_data=Actions.ADMIN_MAIN)
         ]])
         
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -2214,7 +2215,7 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
             "📢 *Рассылка*\n\nВведите сообщение для рассылки всем пользователям:",
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("🔙 Отмена", callback_data=Actions.ADMIN_MENU)
+                InlineKeyboardButton("🔙 Отмена", callback_data=Actions.ADMIN_MAIN)
             ]])
         )
     
