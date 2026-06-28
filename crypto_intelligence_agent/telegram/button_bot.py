@@ -2049,6 +2049,26 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
     
     # ============ ADMIN METHODS ============
     
+
+    def _get_full_admin_menu_keyboard(self) -> InlineKeyboardMarkup:
+        """Полное меню для администратора - все кнопки + админ-функции"""
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔍 НАЙТИ МОНЕТЫ", callback_data=Actions.SCAN_BUY_SIGNALS)],
+            [InlineKeyboardButton("📊 ТОП-10", callback_data=Actions.SCAN_TOP_10)],
+            [InlineKeyboardButton("📈 СИГНАЛЫ", callback_data=Actions.SCAN_SIGNALS)],
+            [InlineKeyboardButton("🔄 ОБНОВИТЬ", callback_data=Actions.SCAN_REFRESH)],
+            [InlineKeyboardButton("💎 PREMIUM АНАЛИЗ", callback_data=Actions.PREMIUM_DEEP)],
+            [InlineKeyboardButton("⏱️ АНАЛИЗ ПЕРИОДА", callback_data=Actions.PREMIUM_SIGNAL)],
+            [InlineKeyboardButton("🔔 Оповещения", callback_data=Actions.MENU_ALERTS)],
+            [InlineKeyboardButton("🧠 ADVANCED SYSTEM", callback_data=Actions.ADVANCED_SYSTEM)],
+            [InlineKeyboardButton("━━━━━━━━━━━━━━━", callback_data="noop")],
+            [InlineKeyboardButton("📊 Статистика", callback_data=Actions.ADMIN_STATS)],
+            [InlineKeyboardButton("📡 ИСТОЧНИКИ", callback_data=Actions.DATA_SOURCES_INFO)],
+            [InlineKeyboardButton("👥 Пользователи", callback_data=Actions.ADMIN_USERS)],
+            [InlineKeyboardButton("📢 Рассылка", callback_data=Actions.ADMIN_BROADCAST)],
+            [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+        ])
+
     def _get_admin_keyboard(self) -> InlineKeyboardMarkup:
         return InlineKeyboardMarkup([
             [InlineKeyboardButton("📊 Статистика", callback_data=Actions.ADMIN_STATS)],
