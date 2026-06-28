@@ -46,6 +46,7 @@ POPULAR_TOKENS = [
 class Actions:
     # Main menu
     MENU_MAIN = "menu_main"
+    ADMIN_MAIN = "admin_main"
     MENU_BACK = "menu_back"
     
     # Analysis menu
@@ -341,6 +342,8 @@ class ButtonBot:
         # Handle based on current state and action
         if data == Actions.MENU_MAIN or data == Actions.MENU_BACK:
             await self._show_main_menu(query)
+        elif data == Actions.ADMIN_MAIN:
+            await self._show_admin_main_menu(query)
         
         elif data == Actions.MENU_ANALYSIS:
             await self._show_analysis_menu(query)
@@ -647,6 +650,15 @@ class ButtonBot:
             [InlineKeyboardButton("👑 Админ", callback_data=Actions.ADMIN_ENTER)]
         ])
     
+    async def _show_admin_main_menu(self, query):
+        """Показать админ-панель"""
+        await self._safe_edit_message(
+            query,
+            "👑 *Админ-панель*\n\nВыберите действие:",
+            parse_mode="Markdown",
+            reply_markup=self._get_full_admin_menu_keyboard()
+        )
+
     async def _show_main_menu(self, query):
         """Show main menu with trial check"""
         user_id = query.from_user.id
@@ -884,19 +896,54 @@ class ButtonBot:
                 )
                 return
             
-            text = coin.to_full_card()
-            
-            # Calculate trading levels
+            # Подробный анализ монеты
+            text = f"""🪙 *{coin.name} ({coin.symbol})*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+💰 *Цена:* ${coin.price:,.6f}
+📊 *Капитализация:* ${coin.market_cap/1e9:.2f}B
+📈 *Изменение 24ч:* {coin.price_change_24h:+.1f}%
+📉 *Изменение 7д:* {coin.price_change_7d:+.1f}%
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎯 *Рекомендация:* {coin.emoji} {coin.recommendation}
+📊 *Общий балл:* {coin.total_score:.0f}/100
+📈 *Потенциал роста:* {coin.growth_potential:.0f}%
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📊 *Детальный анализ:*
+
+🔹 Social Score: {coin.social_score:.0f}/100
+🔹 Sentiment: {coin.sentiment_score:.0f}/100
+🔹 Whale Activity: {coin.whale_score:.0f}/100
+🔹 Technical: {coin.technical_score:.0f}/100
+🔹 Volume: {coin.volume_score:.0f}/100"""
+
+            # Обоснование рекомендации
+            if coin.rationale:
+                text += f"\n━━━━━━━━━━━━━━━\n💡 *Почему {coin.recommendation}:*"
+                for r in coin.rationale[:3]:
+                    text += f"\n• {r}"
+
+            # Риски
+            if coin.risks:
+                text += f"\n━━━━━━━━━━━━━━━\n⚠️ *Риски:*"
+                for r in coin.risks[:2]:
+                    text += f"\n• {r}"
+
+            # Торговые уровни
             entry = coin.price
             stop_loss = coin.price * 0.95
             take_profit = coin.price * 1.25 if coin.total_score > 70 else coin.price * 1.15
-            
-            text += f"\n━━━━━━━━━━━━━━━\n"
-            text += f"📐 *Торговые уровни:*\n"
+
+            text += f"\n━━━━━━━━━━━━━━━\n📐 *Торговые уровни:*\n"
             text += f"• Вход: ${entry:,.6f}\n"
             text += f"• TP: ${take_profit:,.6f} (+{((take_profit/entry)-1)*100:.1f}%)\n"
             text += f"• SL: ${stop_loss:,.6f} ({((stop_loss/entry)-1)*100:.1f}%)\n"
-            
+
             text += f"\n⚠️ Не является финансовой рекомендацией!"
             
             keyboard = InlineKeyboardMarkup([
@@ -2059,7 +2106,7 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
             [InlineKeyboardButton("📡 ИСТОЧНИКИ", callback_data=Actions.DATA_SOURCES_INFO)],
             [InlineKeyboardButton("👥 Пользователи", callback_data=Actions.ADMIN_USERS)],
             [InlineKeyboardButton("📢 Рассылка", callback_data=Actions.ADMIN_BROADCAST)],
-            [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+            [InlineKeyboardButton("🔙 Админ-панель", callback_data=Actions.ADMIN_MAIN)]
         ])
 
 
