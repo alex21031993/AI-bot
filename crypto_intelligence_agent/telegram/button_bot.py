@@ -1204,16 +1204,6 @@ class ButtonBot:
 
 Выберите функцию для анализа:
 
-🔍 AI-анализ токенов
-👤 Smart Money Tracker
-📊 PRO-отчёты
-📈 Early Pump Detector
-🛡️ Rug Pull Detector
-🐋 Анализ китов
-🔄 Meme Coin Scanner
-🧠 AI Confidence Engine
-📉 AI Entry & Exit
-
 ━━━━━━━━━━━━━━━━━━━━━━━━
 💎 У вас полный доступ (PREMIUM)
 """
