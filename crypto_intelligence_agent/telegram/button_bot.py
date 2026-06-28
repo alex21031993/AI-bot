@@ -101,6 +101,7 @@ class Actions:
     # Scanner actions
     SCAN_BUY_SIGNALS = "scan_buy"
     SCAN_TOP_10 = "scan_top10"
+    SCAN_TOP_20 = "scan_top20"
     SCAN_SIGNALS = "scan_signals"
     SCAN_REFRESH = "scan_refresh"
     SCAN_COIN_DETAIL = "scan_detail_"
@@ -356,6 +357,9 @@ class ButtonBot:
             await self._show_buy_signals(query)
         
         elif data == Actions.SCAN_TOP_10:
+            await self._show_top_coins(query, limit=10)
+        elif data == Actions.SCAN_TOP_20:
+            await self._show_top_coins(query, limit=20)
             await self._show_top_10(query)
         
         elif data == Actions.SCAN_SIGNALS:
@@ -625,7 +629,7 @@ class ButtonBot:
         if is_admin:
             return InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔍 НАЙТИ МОНЕТЫ", callback_data=Actions.SCAN_BUY_SIGNALS)],
-                [InlineKeyboardButton("📊 ТОП-10", callback_data=Actions.SCAN_TOP_10)],
+                [InlineKeyboardButton("📊 ТОП-20 🏆", callback_data=Actions.SCAN_TOP_20)],
                 [InlineKeyboardButton("📈 СИГНАЛЫ", callback_data=Actions.SCAN_SIGNALS)],
                 [InlineKeyboardButton("🔄 ОБНОВИТЬ", callback_data=Actions.SCAN_REFRESH)],
                 [InlineKeyboardButton("💎 PREMIUM АНАЛИЗ", callback_data=Actions.PREMIUM_DEEP)],
@@ -644,7 +648,7 @@ class ButtonBot:
         # Trial active - show all buttons + days remaining
         return InlineKeyboardMarkup([
             [InlineKeyboardButton("🔍 НАЙТИ МОНЕТЫ", callback_data=Actions.SCAN_BUY_SIGNALS)],
-            [InlineKeyboardButton("📊 ТОП-10", callback_data=Actions.SCAN_TOP_10)],
+            [InlineKeyboardButton("📊 ТОП-20 🏆", callback_data=Actions.SCAN_TOP_20)],
             [InlineKeyboardButton("📈 СИГНАЛЫ", callback_data=Actions.SCAN_SIGNALS)],
             [InlineKeyboardButton("🔄 ОБНОВИТЬ", callback_data=Actions.SCAN_REFRESH)],
             [InlineKeyboardButton("💎 PREMIUM АНАЛИЗ", callback_data=Actions.PREMIUM_DEEP)],
@@ -740,7 +744,7 @@ class ButtonBot:
             
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔄 Обновить", callback_data=Actions.SCAN_REFRESH)],
-                [InlineKeyboardButton("📊 ТОП-10", callback_data=Actions.SCAN_TOP_10)],
+                [InlineKeyboardButton("📊 ТОП-20 🏆", callback_data=Actions.SCAN_TOP_20)],
                 [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
             ])
             
@@ -754,7 +758,7 @@ class ButtonBot:
                 ]])
             )
     
-    async def _show_top_10(self, query):
+    async def _show_top_coins(self, query, limit=10):
         """Показать топ-10 монет по баллам"""
         await query.edit_message_text("📊 *Сканирую рынок...*\n\nАнализирую топ-100 монет")
         
@@ -868,7 +872,7 @@ class ButtonBot:
             
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔍 НАЙТИ МОНЕТЫ", callback_data=Actions.SCAN_BUY_SIGNALS)],
-                [InlineKeyboardButton("📊 ТОП-10", callback_data=Actions.SCAN_TOP_10)],
+                [InlineKeyboardButton("📊 ТОП-20 🏆", callback_data=Actions.SCAN_TOP_20)],
                 [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
             ])
             
@@ -2098,7 +2102,7 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
         """Полное меню для администратора - все кнопки + админ-функции"""
         return InlineKeyboardMarkup([
             [InlineKeyboardButton("🔍 НАЙТИ МОНЕТЫ", callback_data=Actions.SCAN_BUY_SIGNALS)],
-            [InlineKeyboardButton("📊 ТОП-10", callback_data=Actions.SCAN_TOP_10)],
+            [InlineKeyboardButton("📊 ТОП-20 🏆", callback_data=Actions.SCAN_TOP_20)],
             [InlineKeyboardButton("📈 СИГНАЛЫ", callback_data=Actions.SCAN_SIGNALS)],
             [InlineKeyboardButton("🔄 ОБНОВИТЬ", callback_data=Actions.SCAN_REFRESH)],
             [InlineKeyboardButton("💎 PREMIUM АНАЛИЗ", callback_data=Actions.PREMIUM_DEEP)],
