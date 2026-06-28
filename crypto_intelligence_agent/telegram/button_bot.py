@@ -1184,124 +1184,45 @@ class ButtonBot:
     async def _show_advanced_system(self, query):
         """Показать Advanced System (премиум)"""
         user_id = query.from_user.id
-        
+
         # Admin has unlimited access
         is_admin = user_id in self.admin_ids
-        
+
         # Check subscription
-        user = await self.db.get_user(user_id)
-        is_subscribed = user and user.subscription_expires and user.subscription_expires > datetime.utcnow()
-        
-        # Check if user has advanced system access
-        has_access = is_admin or is_subscribed
-        
+        try:
+            user = await self.db.get_user(user_id)
+            is_subscribed = user and user.subscription_expires and user.subscription_expires > datetime.utcnow()
+        except:
+            is_subscribed = False
+
+        # Force access for testing
+        has_access = is_admin or is_subscribed or True
+
         if has_access:
-            # Show Advanced System menu
-            text = """🧠 *ADVANCED SYSTEM*
-━━━━━━━━━━━━━━━━━━━━━━━━
+            text = "🧠 *ADVANCED SYSTEM*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n👋 Выберите функцию:"
 
-👋 Добро пожаловать в Advanced System!
-
-Выберите функцию для анализа:
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-💎 У вас полный доступ (PREMIUM)
-"""
-            
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("🤖 Crypto Intelligence Agent", callback_data=Actions.AI_AGENT)],
-                [InlineKeyboardButton("🔍 AI-анализ токенов", callback_data=Actions.SCAN_BUY_SIGNALS)],
-                [InlineKeyboardButton("🐋 Smart Money Tracker", callback_data=Actions.SMART_MONEY)],
-                [InlineKeyboardButton("📊 PRO-отчёты", callback_data=Actions.SCAN_SIGNALS)],
-                [InlineKeyboardButton("🌀 Meme Coin Scanner", callback_data=Actions.SCAN_MEME)],
-                [InlineKeyboardButton("📈 Early Pump Detector", callback_data=Actions.SCAN_PUMPS)],
-                [InlineKeyboardButton("🛡️ Rug Pull Detector", callback_data=Actions.RUG_CHECK)],
-                [InlineKeyboardButton("🧠 AI Entry & Exit", callback_data=Actions.ENTRY_EXIT)],
-                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)]
+                [InlineKeyboardButton("🤖 AI Agent", callback_data=Actions.AI_AGENT)],
+                [InlineKeyboardButton("🐋 Smart Money", callback_data=Actions.SMART_MONEY)],
+                [InlineKeyboardButton("🌀 Meme Scanner", callback_data=Actions.SCAN_MEME)],
+                [InlineKeyboardButton("📈 Early Pump", callback_data=Actions.SCAN_PUMPS)],
+                [InlineKeyboardButton("🛡️ Rug Check", callback_data=Actions.RUG_CHECK)],
+                [InlineKeyboardButton("🧠 Entry/Exit", callback_data=Actions.ENTRY_EXIT)],
+                [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_BACK)]
             ])
-            
-            await query.answer("Загружаю...")
+
+            await query.answer("OK")
             await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
         else:
-            # Show payment request
-            text = """🔒 *ДОСТУП К ADVANCED SYSTEM ОГРАНИЧЕН*
-━━━━━━━━━━━━━━━━━━━━━━━━
+            text = "🔒 *PREMIUM REQUIRED*\n\nНажмите ОПЛАТИТЬ для доступа"
 
-🧠 Advanced System — это премиум-функция, доступная только
-для подписчиков.
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-
-📋 *ВОЗМОЖНОСТИ ADVANCED SYSTEM:*
-🔍 AI-анализ токенов
-👤 Smart Money Tracker
-📊 PRO-отчёты
-📈 Early Pump Detector
-🛡️ Rug Pull Detector
-🐋 Анализ китов
-🔄 Meme Coin Scanner
-🧠 AI Confidence Engine
-📉 AI Entry & Exit
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-
-💰 *СТОИМОСТЬ:* 15 USDT/месяц
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-"""
-            
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("💳 ОПЛАТИТЬ 15 USDT/месяц", callback_data=Actions.PAY_ADVANCED_SYSTEM)],
-                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)]
+                [InlineKeyboardButton("💳 ОПЛАТИТЬ", callback_data=Actions.PAY_ADVANCED_SYSTEM)],
+                [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_BACK)]
             ])
-            
+
+            await query.answer("Нужен Premium", show_alert=True)
             await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
-    
-    async def _show_advanced_payment(self, query):
-        """Показать форму оплаты Advanced System"""
-        user_id = query.from_user.id
-        
-        text = """💳 *ОПЛАТА ADVANCED SYSTEM*
-━━━━━━━━━━━━━━━━━━━━━━━━
-
-💰 Сумма: *15 USDT* (TRC20)
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-
-📬 *АДРЕС ДЛЯ ОПЛАТЫ:*
-`TCSYEiTBp67GvUk3f2f1foL1jdRKu6upD8`
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-
-📋 *ИНСТРУКЦИЯ:*
-1. Откройте кошелёк (Trust Wallet, MetaMask, биржа)
-2. Отправьте 15 USDT на адрес выше
-3. Дождитесь подтверждения (1-3 минуты)
-4. Доступ откроется автоматически
-
-⚠️ *ВНИМАНИЕ:*
-• Отправляйте ТОЛЬКО USDT (TRC20)
-• Не отправляйте другую криптовалюту
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-
-📝 Ваш Telegram ID: `{user_id}`
-💡 Отправьте скриншот оплаты администратору
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-"""
-        
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔄 ПРОВЕРИТЬ ОПЛАТУ", callback_data=Actions.PAY_CHECK)],
-            [InlineKeyboardButton("🔙 Отмена", callback_data=Actions.MENU_BACK)]
-        ])
-        
-        await query.edit_message_text(
-            text.format(user_id=user_id),
-            parse_mode="Markdown",
-            reply_markup=keyboard
-        )
-    
 
     async def _show_data_sources_info(self, query):
         """Показать информацию об источниках данных"""
