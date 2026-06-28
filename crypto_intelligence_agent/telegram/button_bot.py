@@ -562,7 +562,7 @@ class ButtonBot:
                         await update.message.reply_text(
                             f"❌ Неверный пароль. Осталось попыток: {3 - attempts}",
                             reply_markup=InlineKeyboardMarkup([[
-                                InlineKeyboardButton("🔙 Отмена", callback_data=Actions.MENU_MAIN)
+                                InlineKeyboardButton("🔙 Отмена", callback_data=Actions.MENU_BACK)
                             ]])
                         )
             return
@@ -605,7 +605,7 @@ class ButtonBot:
             "⚠️ *Используйте кнопки для управления ботом.*\n\nНажмите /start для главного меню.",
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("📱 Главное меню", callback_data=Actions.MENU_MAIN)
+                InlineKeyboardButton("📱 Главное меню", callback_data=Actions.MENU_BACK)
             ]])
         )
     
@@ -639,7 +639,7 @@ class ButtonBot:
                 [InlineKeyboardButton("⏱️ АНАЛИЗ ПЕРИОДА", callback_data=Actions.PREMIUM_SIGNAL)],
                 [InlineKeyboardButton("🔔 Оповещения", callback_data=Actions.MENU_ALERTS)],
                 [InlineKeyboardButton("🧠 ADVANCED SYSTEM", callback_data=Actions.ADVANCED_SYSTEM)],
-                [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
+                [InlineKeyboardButton("👑 Админ", callback_data=Actions.ADMIN_ENTER)]
             ])
         
         # If trial expired - show only subscription
@@ -748,7 +748,7 @@ class ButtonBot:
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔄 Обновить", callback_data=Actions.SCAN_REFRESH)],
                 [InlineKeyboardButton("📊 ТОП-20 🏆", callback_data=Actions.SCAN_TOP_20)],
-                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)]
             ])
             
             await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -757,7 +757,7 @@ class ButtonBot:
             await query.edit_message_text(
                 f"❌ Ошибка сканирования: {str(e)}",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)
                 ]])
             )
     
@@ -800,7 +800,7 @@ class ButtonBot:
                 keyboard_buttons.append(row)
             
             keyboard_buttons.append([InlineKeyboardButton("🔄 Обновить", callback_data=Actions.SCAN_REFRESH)])
-            keyboard_buttons.append([InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)])
+            keyboard_buttons.append([InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)])
             
             await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard_buttons))
             
@@ -808,7 +808,7 @@ class ButtonBot:
             await query.edit_message_text(
                 f"❌ Ошибка: {str(e)}",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)
                 ]])
             )
     
@@ -843,7 +843,7 @@ class ButtonBot:
                 [InlineKeyboardButton("🟢 BUY", callback_data=Actions.SCAN_BUY_SIGNALS)],
                 [InlineKeyboardButton("🔴 SELL", callback_data="show_sell")],
                 [InlineKeyboardButton("🔄 Обновить", callback_data=Actions.SCAN_REFRESH)],
-                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)]
             ])
             
             await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -852,7 +852,7 @@ class ButtonBot:
             await query.edit_message_text(
                 f"❌ Ошибка: {str(e)}",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)
                 ]])
             )
     
@@ -876,7 +876,7 @@ class ButtonBot:
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔍 НАЙТИ МОНЕТЫ", callback_data=Actions.SCAN_BUY_SIGNALS)],
                 [InlineKeyboardButton("📊 ТОП-20 🏆", callback_data=Actions.SCAN_TOP_20)],
-                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)]
             ])
             
             await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -885,7 +885,7 @@ class ButtonBot:
             await query.edit_message_text(
                 f"❌ Ошибка: {str(e)}",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)
                 ]])
             )
     
@@ -960,7 +960,7 @@ class ButtonBot:
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("👁️ Добавить в отслеживание", callback_data=f"track_{symbol}")],
                 [InlineKeyboardButton("🔄 Другие монеты", callback_data=Actions.SCAN_TOP_10)],
-                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)]
             ])
             
             await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -969,7 +969,7 @@ class ButtonBot:
             await query.edit_message_text(
                 f"❌ Ошибка: {str(e)}",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)
                 ]])
             )
     
@@ -983,7 +983,7 @@ class ButtonBot:
             await query.edit_message_text(
                 "❌ Доступ запрещён!",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)
                 ]])
             )
             return
@@ -1046,7 +1046,7 @@ class ButtonBot:
             
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("💳 КУПИТЬ 10 АНАЛИЗОВ - $1.99", callback_data=Actions.PAY_PREMIUM_USES)],
-                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)]
             ])
             
             await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -1083,7 +1083,7 @@ class ButtonBot:
                 
                 keyboard = InlineKeyboardMarkup([
                     [InlineKeyboardButton("🔄 ОБНОВИТЬ", callback_data=Actions.PREMIUM_DEEP)],
-                    [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+                    [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)]
                 ])
                 
                 await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -1091,14 +1091,14 @@ class ButtonBot:
                 await query.edit_message_text(
                     "❌ Ошибка анализа. Попробуйте позже.",
                     reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                        InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)
                     ]])
                 )
         except Exception as e:
             await query.edit_message_text(
                 f"❌ Ошибка: {str(e)}",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)
                 ]])
             )
     
@@ -1140,7 +1140,7 @@ class ButtonBot:
         
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔄 ПРОВЕРИТЬ ОПЛАТУ", callback_data=Actions.PAY_CHECK)],
-            [InlineKeyboardButton("🔙 Отмена", callback_data=Actions.MENU_MAIN)]
+            [InlineKeyboardButton("🔙 Отмена", callback_data=Actions.MENU_BACK)]
         ])
         
         await query.edit_message_text(
@@ -1190,7 +1190,7 @@ class ButtonBot:
                 [InlineKeyboardButton("🔍 AI-анализ токенов", callback_data=Actions.SCAN_BUY_SIGNALS)],
                 [InlineKeyboardButton("🐋 Smart Money Tracker", callback_data=Actions.SCAN_TOP_10)],
                 [InlineKeyboardButton("📊 PRO-отчёты", callback_data=Actions.SCAN_SIGNALS)],
-                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)]
             ])
             
             await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -1224,7 +1224,7 @@ class ButtonBot:
             
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("💳 ОПЛАТИТЬ 15 USDT/месяц", callback_data=Actions.PAY_ADVANCED_SYSTEM)],
-                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)]
             ])
             
             await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -1265,7 +1265,7 @@ class ButtonBot:
         
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔄 ПРОВЕРИТЬ ОПЛАТУ", callback_data=Actions.PAY_CHECK)],
-            [InlineKeyboardButton("🔙 Отмена", callback_data=Actions.MENU_MAIN)]
+            [InlineKeyboardButton("🔙 Отмена", callback_data=Actions.MENU_BACK)]
         ])
         
         await query.edit_message_text(
@@ -1342,7 +1342,7 @@ class ButtonBot:
 """
         
         keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+            [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)]
         ])
         
         await query.edit_message_text(
@@ -1403,7 +1403,7 @@ class ButtonBot:
                     
                     keyboard = InlineKeyboardMarkup([
                         [InlineKeyboardButton("💳 КУПИТЬ ПОДПИСКУ", callback_data=Actions.MENU_SUBSCRIBE)],
-                        [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+                        [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)]
                     ])
                     
                     await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -1434,7 +1434,7 @@ class ButtonBot:
                 [InlineKeyboardButton("🕐 1 ЧАС", callback_data=Actions.PERIOD_1H)],
                 [InlineKeyboardButton("🕐 3 ЧАСА", callback_data=Actions.PERIOD_3H)],
                 [InlineKeyboardButton("🕐 24 ЧАСА", callback_data=Actions.PERIOD_24H)],
-                [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
+                [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_BACK)]
             ])
             
             await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -1443,7 +1443,7 @@ class ButtonBot:
             await query.edit_message_text(
                 f"❌ Ошибка: {str(e)}",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)
                 ]])
             )
     
@@ -1472,7 +1472,7 @@ class ButtonBot:
                 await query.edit_message_text(
                     "❌ Ошибка анализа. Попробуйте позже.",
                     reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)
+                        InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_BACK)
                     ]])
                 )
                 return
@@ -1489,7 +1489,7 @@ class ButtonBot:
             
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("🔄 ДРУГАЯ МОНЕТА", callback_data=Actions.PREMIUM_SIGNAL)],
-                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)]
             ])
             
             await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -1498,7 +1498,7 @@ class ButtonBot:
             await query.edit_message_text(
                 f"❌ Ошибка: {str(e)}",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)
                 ]])
             )
     
@@ -1557,7 +1557,7 @@ class ButtonBot:
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔍 Проверить оплату", callback_data=Actions.PAY_CHECK)],
             [InlineKeyboardButton("💎 Другие планы", callback_data=Actions.MENU_SUBSCRIBE)],
-            [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+            [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)]
         ])
         
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -1578,7 +1578,7 @@ class ButtonBot:
                 await query.edit_message_text(
                     "❌ Адрес не настроен",
                     reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)
+                        InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_BACK)
                     ]])
                 )
                 return
@@ -1657,7 +1657,7 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
 """
             
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)]
             ])
             
             await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -1666,7 +1666,7 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
             await query.edit_message_text(
                 f"❌ Ошибка проверки: {str(e)}",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)
+                    InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_BACK)
                 ]])
             )
     
@@ -1684,7 +1684,7 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("🔥 Популярные монеты", callback_data=Actions.SELECT_TOKEN)],
             [InlineKeyboardButton("➕ Ввести свою монету", callback_data="custom_token_input")],
-            [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
+            [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_BACK)]
         ])
         
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -1722,7 +1722,7 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
             keyboard = InlineKeyboardMarkup([
                 [InlineKeyboardButton("📊 Другой анализ", callback_data=Actions.MENU_ANALYSIS)],
                 [InlineKeyboardButton("👁️ Добавить в портфель", callback_data=f"{Actions.TOKEN_SELECT}watchlist_add_{token}")],
-                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)]
             ])
             
             await query.edit_message_text(result, parse_mode="Markdown", reply_markup=keyboard)
@@ -1750,7 +1750,7 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
             [InlineKeyboardButton("👁️ Показать портфель", callback_data=Actions.WATCHLIST_SHOW)],
             [InlineKeyboardButton("➕ Добавить монету", callback_data=Actions.WATCHLIST_ADD)],
             [InlineKeyboardButton("➖ Удалить монету", callback_data=Actions.WATCHLIST_REMOVE)],
-            [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
+            [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_BACK)]
         ])
         
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -1790,7 +1790,7 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("📊 Анализировать", callback_data=f"{Actions.TOKEN_SELECT}analysis_{token}")],
             [InlineKeyboardButton("👁️ К портфелю", callback_data=Actions.MENU_WATCHLIST)],
-            [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+            [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)]
         ])
         
         await query.edit_message_text(
@@ -1833,7 +1833,7 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
         
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("👁️ К портфелю", callback_data=Actions.MENU_WATCHLIST)],
-            [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+            [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)]
         ])
         
         await query.edit_message_text(
@@ -1856,7 +1856,7 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("📊 Активные сигналы", callback_data=Actions.SIGNALS_ACTIVE)],
             [InlineKeyboardButton("📋 Мои сигналы", callback_data="my_signals")],
-            [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
+            [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_BACK)]
         ])
         
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -1898,7 +1898,7 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
             [InlineKeyboardButton("🔔 Мои оповещения", callback_data=Actions.ALERTS_SHOW)],
             [InlineKeyboardButton("📈 Когда цена вырастет", callback_data=Actions.ALERTS_ABOVE)],
             [InlineKeyboardButton("📉 Когда цена упадёт", callback_data=Actions.ALERTS_BELOW)],
-            [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
+            [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_BACK)]
         ])
         
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -2019,7 +2019,7 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
             [InlineKeyboardButton("🎁 TRIAL — $2.99", callback_data=Actions.PAY_TRIAL)],
             [InlineKeyboardButton("⭐ STANDARD — $4.99", callback_data=Actions.PAY_STANDARD)],
             [InlineKeyboardButton("💎 PREMIUM — $14.99", callback_data=Actions.PAY_PREMIUM)],
-            [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
+            [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_BACK)]
         ])
         
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -2053,7 +2053,7 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("💳 Отправить TX hash", callback_data="input_tx_hash")],
             [InlineKeyboardButton("🔙 К подпискам", callback_data=Actions.MENU_SUBSCRIBE)],
-            [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+            [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)]
         ])
         
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -2079,7 +2079,7 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
             [InlineKeyboardButton(f"🔔 Сигналы: {sig_status}", callback_data=Actions.SETTINGS_NOTIFY_SIGNALS)],
             [InlineKeyboardButton(f"🐋 Киты: {whale_status}", callback_data=Actions.SETTINGS_NOTIFY_WHALE)],
             [InlineKeyboardButton(f"💰 Цены: {price_status}", callback_data=Actions.SETTINGS_NOTIFY_PRICE)],
-            [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
+            [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_BACK)]
         ])
         
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -2140,7 +2140,7 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
                 [InlineKeyboardButton("📡 ИСТОЧНИКИ", callback_data=Actions.DATA_SOURCES_INFO)],
             [InlineKeyboardButton("👥 Пользователи", callback_data=Actions.ADMIN_USERS)],
             [InlineKeyboardButton("📢 Рассылка", callback_data=Actions.ADMIN_BROADCAST)],
-            [InlineKeyboardButton("🔙 Выход", callback_data=Actions.MENU_MAIN)]
+            [InlineKeyboardButton("🔙 Выход", callback_data=Actions.MENU_BACK)]
         ])
     
     async def _request_admin_password(self, query):
@@ -2153,7 +2153,7 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
                 "❌ *Доступ запрещён*\n\nУ вас нет прав администратора.",
                 parse_mode="Markdown",
                 reply_markup=InlineKeyboardMarkup([[
-                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)
+                    InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)
                 ]])
             )
             return
@@ -2165,7 +2165,7 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
             "🔐 *Введите пароль администратора:*\n\nЭто ЕДИНСТВЕННЫЙ случай когда можно ввести текст.",
             parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("🔙 Отмена", callback_data=Actions.MENU_MAIN)
+                InlineKeyboardButton("🔙 Отмена", callback_data=Actions.MENU_BACK)
             ]])
         )
     
