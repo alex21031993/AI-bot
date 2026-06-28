@@ -766,9 +766,9 @@ class ButtonBot:
         
         try:
             coins = await self.scanner.scan_market(100)
-            top_coins = coins[:10]
+            top_coins = coins[:limit]
             
-            text = f"""📊 *ТОП-10 монет по потенциалу*
+            text = f"""📊 *ТОП-{limit} монет по потенциалу*
 
 Рейтинг составлен на основе:
 • Объем торгов
