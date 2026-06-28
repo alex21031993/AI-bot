@@ -363,7 +363,6 @@ class ButtonBot:
             await self._show_top_coins(query, limit=10)
         elif data == Actions.SCAN_TOP_20:
             await self._show_top_coins(query, limit=20)
-            await self._show_top_10(query)
         
         elif data == Actions.SCAN_SIGNALS:
             await self._show_all_signals(query)
@@ -791,7 +790,7 @@ class ButtonBot:
             # Add coins as buttons for details
             keyboard_buttons = []
             row = []
-            for coin in top_coins[:5]:
+            for coin in top_coins:
                 row.append(InlineKeyboardButton(f"{coin.emoji} {coin.symbol}", callback_data=f"{Actions.SCAN_COIN_DETAIL}{coin.symbol}"))
                 if len(row) == 2:
                     keyboard_buttons.append(row)
