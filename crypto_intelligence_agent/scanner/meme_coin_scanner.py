@@ -57,7 +57,9 @@ class MemeCoinScanner:
     # Известные мем-токены для отслеживания
     KNOWN_MEME_TOKENS = [
         "dogecoin", "shiba-inu", "pepe", "dogwifcoin", "brett", "popcat",
-        "hodl", "mog", "neiro", "chillguy", "act-i", "ai16z", "luna"
+        "hodl", "mog", "neiro", "chillguy", "act-i", "ai16z", "luna",
+        "dogwiftoken", "bonk", "floki", "baby-doge-coin", "samoyedcoin",
+        " render-token", "goatseus-maximum"
     ]
     
     def __init__(self):
