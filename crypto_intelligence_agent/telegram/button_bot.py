@@ -460,8 +460,31 @@ class ButtonBot:
         if self.user_states.get(user_id) == Actions.ADMIN_ENTER:
             if user_id in self.admin_ids:
                 if text == self.admin_password:
+                    user = await self.db.get_user(user_id)
+                    first_name = update.effective_user.first_name or "Администратор"
+                    
+                    admin_welcome = f"""👑 *Вы вошли как администратор!*
+
+👋 Привет, {first_name}!
+
+🐋 *Crypto Intelligence Bot*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🎁 *Бесплатный неограниченный доступ!*
+
+💎 Вам доступны все функции без ограничений:
+• Все анализы и сканирования
+• Premium функции
+• Advanced System
+• Управление пользователями
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+👇 *Выберите действие:*"""
+                    
                     await update.message.reply_text(
-                        "👑 *Вы вошли как администратор!*\n\nВам доступны все функции без ограничений.",
+                        admin_welcome,
                         parse_mode="Markdown",
                         reply_markup=self._get_admin_keyboard()
                     )
