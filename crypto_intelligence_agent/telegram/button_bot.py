@@ -125,6 +125,13 @@ class Actions:
     PREMIUM_DEEP = "premium_deep"
     ADVANCED_SYSTEM = "advanced_system"
     PAY_ADVANCED_SYSTEM = "pay_advanced_system"
+    SCAN_MEME = "scan_meme"
+    SCAN_PUMPS = "scan_pumps"
+    SMART_MONEY = "smart_money"
+    ENTRY_EXIT = "entry_exit"
+    RUG_CHECK = "rug_check"
+    AI_AGENT = "ai_agent"
+    AI_ANALYZE = "ai_analyze"
     PAY_PREMIUM_USES = "pay_premium_uses"
     
     # Admin panel (for when admin is already authenticated)
@@ -414,6 +421,32 @@ class ButtonBot:
         
         elif data == Actions.PAY_ADVANCED_SYSTEM:
             await self._show_advanced_payment(query)
+
+        # Advanced System sub-menus
+        elif data == Actions.SCAN_MEME:
+            await self._show_meme_coins(query)
+        elif data == Actions.SCAN_PUMPS:
+            await self._show_early_pumps(query)
+        elif data == Actions.SMART_MONEY:
+            await self._show_smart_money(query)
+        elif data == Actions.ENTRY_EXIT:
+            await self._show_entry_exit(query)
+        elif data == Actions.RUG_CHECK:
+            await self._show_rug_check(query)
+        elif data.startswith("smartmoney_"):
+            token = data.replace("smartmoney_", "")
+            await self._show_smart_money(query, token)
+        elif data.startswith("entryexit_"):
+            token = data.replace("entryexit_", "")
+            await self._show_entry_exit(query, token)
+        elif data.startswith("rugcheck_"):
+            token = data.replace("rugcheck_", "")
+            await self._show_rug_check(query, token)
+        elif data == Actions.AI_AGENT:
+            await self._show_ai_agent(query)
+        elif data.startswith("aianalyze_"):
+            token = data.replace("aianalyze_", "")
+            await self._analyze_with_ai(query, token)
 
         elif data == Actions.PAY_PREMIUM_USES:
             await self._show_premium_uses_payment(query)
@@ -1151,128 +1184,45 @@ class ButtonBot:
     async def _show_advanced_system(self, query):
         """Показать Advanced System (премиум)"""
         user_id = query.from_user.id
-        
+
         # Admin has unlimited access
         is_admin = user_id in self.admin_ids
-        
+
         # Check subscription
-        user = await self.db.get_user(user_id)
-        is_subscribed = user and user.subscription_expires and user.subscription_expires > datetime.utcnow()
-        
-        # Check if user has advanced system access
+        try:
+            user = await self.db.get_user(user_id)
+            is_subscribed = user and user.subscription_expires and user.subscription_expires > datetime.utcnow()
+        except:
+            is_subscribed = False
+
+        # Force access for testing
         has_access = is_admin or is_subscribed
-        
+
         if has_access:
-            # Show Advanced System menu
-            text = """🧠 *ADVANCED SYSTEM*
-━━━━━━━━━━━━━━━━━━━━━━━━
+            text = "🧠 *ADVANCED SYSTEM*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n👋 Выберите функцию:"
 
-👋 Добро пожаловать в Advanced System!
-
-Выберите функцию для анализа:
-
-🔍 AI-анализ токенов
-👤 Smart Money Tracker
-📊 PRO-отчёты
-📈 Early Pump Detector
-🛡️ Rug Pull Detector
-🐋 Анализ китов
-🔄 Meme Coin Scanner
-🧠 AI Confidence Engine
-📉 AI Entry & Exit
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-💎 У вас полный доступ (PREMIUM)
-"""
-            
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("🔍 AI-анализ токенов", callback_data=Actions.SCAN_BUY_SIGNALS)],
-                [InlineKeyboardButton("🐋 Smart Money Tracker", callback_data=Actions.SCAN_TOP_10)],
-                [InlineKeyboardButton("📊 PRO-отчёты", callback_data=Actions.SCAN_SIGNALS)],
-                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)]
+                [InlineKeyboardButton("🤖 AI Agent", callback_data=Actions.AI_AGENT)],
+                [InlineKeyboardButton("🐋 Smart Money", callback_data=Actions.SMART_MONEY)],
+                [InlineKeyboardButton("🌀 Meme Scanner", callback_data=Actions.SCAN_MEME)],
+                [InlineKeyboardButton("📈 Early Pump", callback_data=Actions.SCAN_PUMPS)],
+                [InlineKeyboardButton("🛡️ Rug Check", callback_data=Actions.RUG_CHECK)],
+                [InlineKeyboardButton("🧠 Entry/Exit", callback_data=Actions.ENTRY_EXIT)],
+                [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_BACK)]
             ])
-            
+
+            await query.answer("OK")
             await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
         else:
-            # Show payment request
-            text = """🔒 *ДОСТУП К ADVANCED SYSTEM ОГРАНИЧЕН*
-━━━━━━━━━━━━━━━━━━━━━━━━
+            text = "🔒 *PREMIUM REQUIRED*\n\nНажмите ОПЛАТИТЬ для доступа"
 
-🧠 Advanced System — это премиум-функция, доступная только
-для подписчиков.
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-
-📋 *ВОЗМОЖНОСТИ ADVANCED SYSTEM:*
-🔍 AI-анализ токенов
-👤 Smart Money Tracker
-📊 PRO-отчёты
-📈 Early Pump Detector
-🛡️ Rug Pull Detector
-🐋 Анализ китов
-🔄 Meme Coin Scanner
-🧠 AI Confidence Engine
-📉 AI Entry & Exit
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-
-💰 *СТОИМОСТЬ:* 15 USDT/месяц
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-"""
-            
             keyboard = InlineKeyboardMarkup([
-                [InlineKeyboardButton("💳 ОПЛАТИТЬ 15 USDT/месяц", callback_data=Actions.PAY_ADVANCED_SYSTEM)],
-                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)]
+                [InlineKeyboardButton("💳 ОПЛАТИТЬ", callback_data=Actions.PAY_ADVANCED_SYSTEM)],
+                [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_BACK)]
             ])
-            
+
+            await query.answer("Нужен Premium", show_alert=True)
             await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
-    
-    async def _show_advanced_payment(self, query):
-        """Показать форму оплаты Advanced System"""
-        user_id = query.from_user.id
-        
-        text = """💳 *ОПЛАТА ADVANCED SYSTEM*
-━━━━━━━━━━━━━━━━━━━━━━━━
-
-💰 Сумма: *15 USDT* (TRC20)
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-
-📬 *АДРЕС ДЛЯ ОПЛАТЫ:*
-`TCSYEiTBp67GvUk3f2f1foL1jdRKu6upD8`
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-
-📋 *ИНСТРУКЦИЯ:*
-1. Откройте кошелёк (Trust Wallet, MetaMask, биржа)
-2. Отправьте 15 USDT на адрес выше
-3. Дождитесь подтверждения (1-3 минуты)
-4. Доступ откроется автоматически
-
-⚠️ *ВНИМАНИЕ:*
-• Отправляйте ТОЛЬКО USDT (TRC20)
-• Не отправляйте другую криптовалюту
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-
-📝 Ваш Telegram ID: `{user_id}`
-💡 Отправьте скриншот оплаты администратору
-
-━━━━━━━━━━━━━━━━━━━━━━━━
-"""
-        
-        keyboard = InlineKeyboardMarkup([
-            [InlineKeyboardButton("🔄 ПРОВЕРИТЬ ОПЛАТУ", callback_data=Actions.PAY_CHECK)],
-            [InlineKeyboardButton("🔙 Отмена", callback_data=Actions.MENU_BACK)]
-        ])
-        
-        await query.edit_message_text(
-            text.format(user_id=user_id),
-            parse_mode="Markdown",
-            reply_markup=keyboard
-        )
-    
 
     async def _show_data_sources_info(self, query):
         """Показать информацию об источниках данных"""
@@ -2225,6 +2175,198 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
             ]])
         )
     
+
+
+    # ============ ADVANCED SYSTEM ============
+
+    async def _show_meme_coins(self, query):
+        """Показать Meme Coin Scanner"""
+        await query.edit_message_text("🌀 *MEME COIN SCANNER*\n\n🔍 Ищу мем-коины...\n⏳ Подождите...")
+        
+        try:
+            from crypto_intelligence_agent.scanner.meme_coin_scanner import MemeCoinScanner
+            scanner = MemeCoinScanner()
+            results = await asyncio.wait_for(scanner.scan_meme_coins(limit=10), timeout=45)
+            await scanner.close()
+            
+            report = scanner.format_report(results) if results else "❌ Не удалось найти мем-коины"
+            
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔄 Обновить", callback_data=Actions.SCAN_MEME)],
+                [InlineKeyboardButton("🔙 Назад", callback_data=Actions.ADVANCED_SYSTEM)]
+            ])
+            await query.edit_message_text(report, parse_mode="Markdown", reply_markup=keyboard)
+        except asyncio.TimeoutError:
+            await query.edit_message_text("❌ Таймаут. Попробуйте через несколько минут.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data=Actions.ADVANCED_SYSTEM)]]))
+        except Exception as e:
+            await query.edit_message_text(f"❌ Ошибка: {str(e)}",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data=Actions.ADVANCED_SYSTEM)]]))
+    async def _show_ai_agent(self, query):
+        """Показать Crypto Intelligence Agent"""
+        text = """🤖 *CRYPTO INTELLIGENCE AGENT*
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+Выберите монету для AI-анализа:
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+📊 *ЧТО АНАЛИЗИРУЕТ АГЕНТ:*
+🔍 Социальные сети и настроения
+🐋 Активность китов
+📈 Технические индикаторы
+📊 Объемы торгов
+🎯 Вероятность роста/падения
+"""
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🤖 BTC", callback_data="aianalyze_btc"),
+             InlineKeyboardButton("🤖 ETH", callback_data="aianalyze_eth"),
+             InlineKeyboardButton("🤖 SOL", callback_data="aianalyze_sol")],
+            [InlineKeyboardButton("🤖 DOGE", callback_data="aianalyze_doge"),
+             InlineKeyboardButton("🤖 SHIB", callback_data="aianalyze_shib"),
+             InlineKeyboardButton("🤖 PEPE", callback_data="aianalyze_pepe")],
+            [InlineKeyboardButton("🔙 Назад", callback_data=Actions.ADVANCED_SYSTEM)]
+        ])
+        
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+
+    async def _analyze_with_ai(self, query, token: str):
+        """Анализ монеты с помощью AI Agent"""
+        await query.edit_message_text(
+            f"🤖 *CRYPTO INTELLIGENCE AGENT*\n\n"
+            f"🔍 Анализирую {token.upper()}...\n\n"
+            "⏳ Подождите, это может занять 10-30 секунд..."
+        )
+        
+        try:
+            from crypto_intelligence_agent.agents.crypto_intelligence_agent import CryptoIntelligenceAgent
+            
+            agent = CryptoIntelligenceAgent()
+            metrics = await asyncio.wait_for(agent.analyze_coin(token), timeout=60)
+            await agent.close()
+            
+            report = agent.format_report(metrics)
+            
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔄 Другой токен", callback_data=Actions.AI_AGENT)],
+                [InlineKeyboardButton("🔙 Назад", callback_data=Actions.ADVANCED_SYSTEM)]
+            ])
+            
+            await query.edit_message_text(report, parse_mode="Markdown", reply_markup=keyboard)
+            
+        except asyncio.TimeoutError:
+            await query.edit_message_text(
+                "❌ Таймаут. AI анализ занял слишком долго.\n\n"
+                "Попробуйте снова или выберите другую монету.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data=Actions.AI_AGENT)]])
+            )
+        except Exception as e:
+            await query.edit_message_text(
+                f"❌ Ошибка: {str(e)}",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data=Actions.AI_AGENT)]])
+            )
+
+
+
+    async def _show_early_pumps(self, query):
+        """Показать Early Pump Detector"""
+        await query.edit_message_text("📈 *EARLY PUMP DETECTOR*\n\n🔍 Ищу сигналы...\n⏳ Подождите...")
+        
+        try:
+            from crypto_intelligence_agent.scanner.early_pump_detector import EarlyPumpDetector
+            detector = EarlyPumpDetector()
+            results = await asyncio.wait_for(detector.detect_pumps(limit=10), timeout=45)
+            await detector.close()
+            
+            report = detector.format_report(results) if results else "❌ Не обнаружено"
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔄 Обновить", callback_data=Actions.SCAN_PUMPS)],
+                [InlineKeyboardButton("🔙 Назад", callback_data=Actions.ADVANCED_SYSTEM)]
+            ])
+            await query.edit_message_text(report, parse_mode="Markdown", reply_markup=keyboard)
+        except Exception as e:
+            await query.edit_message_text(f"❌ Ошибка: {str(e)}",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data=Actions.ADVANCED_SYSTEM)]]))
+
+    async def _show_smart_money(self, query, token: str = "bitcoin"):
+        """Показать Smart Money Tracker"""
+        await query.edit_message_text(f"🐋 *SMART MONEY TRACKER*\n\n🔍 Анализирую {token.upper()}...\n⏳ Подождите...")
+        
+        try:
+            from crypto_intelligence_agent.scanner.smart_money_tracker import SmartMoneyTracker
+            tracker = SmartMoneyTracker()
+            result = await asyncio.wait_for(tracker.track_token(token), timeout=30)
+            await tracker.close()
+            
+            report = tracker.format_report(result)
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🐋 BTC", callback_data="smartmoney_btc"),
+                 InlineKeyboardButton("🐋 ETH", callback_data="smartmoney_eth"),
+                 InlineKeyboardButton("🐋 SOL", callback_data="smartmoney_sol")],
+                [InlineKeyboardButton("🔙 Назад", callback_data=Actions.ADVANCED_SYSTEM)]
+            ])
+            await query.edit_message_text(report, parse_mode="Markdown", reply_markup=keyboard)
+        except Exception as e:
+            await query.edit_message_text(f"❌ Ошибка: {str(e)}",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data=Actions.ADVANCED_SYSTEM)]]))
+
+    async def _show_entry_exit(self, query, token: str = "bitcoin"):
+        """Показать AI Entry & Exit"""
+        await query.edit_message_text(f"🧠 *AI ENTRY & EXIT*\n\n🔍 Анализирую {token.upper()}...\n⏳ Подождите...")
+        
+        try:
+            from crypto_intelligence_agent.scanner.ai_entry_exit import AIEntryExitScanner
+            scanner = AIEntryExitScanner()
+            result = await asyncio.wait_for(scanner.analyze(token), timeout=30)
+            await scanner.close()
+            
+            report = scanner.format_report(result)
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🧠 BTC", callback_data="entryexit_btc"),
+                 InlineKeyboardButton("🧠 ETH", callback_data="entryexit_eth"),
+                 InlineKeyboardButton("🧠 SOL", callback_data="entryexit_sol")],
+                [InlineKeyboardButton("🔙 Назад", callback_data=Actions.ADVANCED_SYSTEM)]
+            ])
+            await query.edit_message_text(report, parse_mode="Markdown", reply_markup=keyboard)
+        except Exception as e:
+            await query.edit_message_text(f"❌ Ошибка: {str(e)}",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data=Actions.ADVANCED_SYSTEM)]]))
+
+    async def _show_rug_check(self, query, token: str = None):
+        """Показать Rug Pull Detector"""
+        if not token:
+            text = "🛡️ *RUG PULL DETECTOR*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\nВыберите монету:"
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔍 BTC", callback_data="rugcheck_btc"),
+                 InlineKeyboardButton("🔍 ETH", callback_data="rugcheck_eth"),
+                 InlineKeyboardButton("🔍 SOL", callback_data="rugcheck_sol")],
+                [InlineKeyboardButton("🔍 DOGE", callback_data="rugcheck_doge"),
+                 InlineKeyboardButton("🔍 SHIB", callback_data="rugcheck_shib"),
+                 InlineKeyboardButton("🔍 PEPE", callback_data="rugcheck_pepe")],
+                [InlineKeyboardButton("🔙 Назад", callback_data=Actions.ADVANCED_SYSTEM)]
+            ])
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+            return
+        
+        await query.edit_message_text(f"🛡️ *Проверяю {token.upper()}...*\n\n⏳ Подождите...")
+        
+        try:
+            from crypto_intelligence_agent.scanner.rug_pull_detector import RugPullDetector
+            detector = RugPullDetector()
+            result = await asyncio.wait_for(detector.check_token(token), timeout=30)
+            await detector.close()
+            
+            report = detector.format_report(result)
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔄 Другая", callback_data=Actions.RUG_CHECK)],
+                [InlineKeyboardButton("🔙 Назад", callback_data=Actions.ADVANCED_SYSTEM)]
+            ])
+            await query.edit_message_text(report, parse_mode="Markdown", reply_markup=keyboard)
+        except Exception as e:
+            await query.edit_message_text(f"❌ Ошибка: {str(e)}",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Назад", callback_data=Actions.ADVANCED_SYSTEM)]]))
+
+
     # ============ MONITORING ============
     
     async def start_monitoring(self):
