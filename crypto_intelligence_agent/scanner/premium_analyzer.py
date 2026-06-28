@@ -160,17 +160,16 @@ class PremiumAnalysis:
             f"📈 Давление покупок: {self.whale_buy_pressure:+.0f}%",
         ])
         
-        # Показываем топ-3 кита
+        # Показываем всех китов
         if self.whale_wallets:
-            sorted_wallets = sorted(self.whale_wallets, key=lambda x: x.balance, reverse=True)[:3]
-            lines.extend([
-                f"",
-                f"🏆 *ТОП КИТЫ:*",
-            ])
+            sorted_wallets = sorted(self.whale_wallets, key=lambda x: x.balance, reverse=True)
+            lines.append(f"")
+            lines.append(f"🏆 *КИТЫ ({len(sorted_wallets)}):*")
             for i, wallet in enumerate(sorted_wallets, 1):
                 badge = "💎" if wallet.is_smart_money else "🏦" if wallet.is_exchange else "🐋"
+                change_emoji = "📈" if wallet.change_24h > 0 else "📉"
                 lines.append(f"   {i}. {badge} {wallet.label}")
-                lines.append(f"      💰 ${wallet.balance/1e6:.1f}M | {wallet.change_24h:+.1f}%")
+                lines.append(f"      💰 ${wallet.balance/1e6:.1f}M | {change_emoji} {wallet.change_24h:+.1f}%")
         
         if self.rationale:
             lines.extend([
