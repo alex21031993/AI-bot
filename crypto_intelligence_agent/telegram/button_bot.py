@@ -622,7 +622,6 @@ class ButtonBot:
                 [InlineKeyboardButton("👑 АДМИН-ПАНЕЛЬ", callback_data=Actions.ADMIN_PANEL)],
                 [InlineKeyboardButton("🧠 ADVANCED SYSTEM", callback_data=Actions.ADVANCED_SYSTEM)],
                 [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
-                [InlineKeyboardButton("📡 ИСТОЧНИКИ", callback_data=Actions.DATA_SOURCES_INFO)],
             ])
         
         # If trial expired - show only subscription
@@ -642,7 +641,6 @@ class ButtonBot:
             [InlineKeyboardButton("🔔 Оповещения", callback_data=Actions.MENU_ALERTS)],
                 [InlineKeyboardButton("🧠 ADVANCED SYSTEM", callback_data=Actions.ADVANCED_SYSTEM)],
             [InlineKeyboardButton("👑 Админ", callback_data=Actions.ADMIN_ENTER)]
-                [InlineKeyboardButton("📡 ИСТОЧНИКИ", callback_data=Actions.DATA_SOURCES_INFO)],
         ])
     
     async def _show_main_menu(self, query):
@@ -1383,7 +1381,6 @@ class ButtonBot:
                 [InlineKeyboardButton("🕐 3 ЧАСА", callback_data=Actions.PERIOD_3H)],
                 [InlineKeyboardButton("🕐 24 ЧАСА", callback_data=Actions.PERIOD_24H)],
                 [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
-                [InlineKeyboardButton("📡 ИСТОЧНИКИ", callback_data=Actions.DATA_SOURCES_INFO)],
             ])
             
             await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -1634,7 +1631,6 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
             [InlineKeyboardButton("🔥 Популярные монеты", callback_data=Actions.SELECT_TOKEN)],
             [InlineKeyboardButton("➕ Ввести свою монету", callback_data="custom_token_input")],
             [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
-                [InlineKeyboardButton("📡 ИСТОЧНИКИ", callback_data=Actions.DATA_SOURCES_INFO)],
         ])
         
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -1701,7 +1697,6 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
             [InlineKeyboardButton("➕ Добавить монету", callback_data=Actions.WATCHLIST_ADD)],
             [InlineKeyboardButton("➖ Удалить монету", callback_data=Actions.WATCHLIST_REMOVE)],
             [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
-                [InlineKeyboardButton("📡 ИСТОЧНИКИ", callback_data=Actions.DATA_SOURCES_INFO)],
         ])
         
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -1808,7 +1803,6 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
             [InlineKeyboardButton("📊 Активные сигналы", callback_data=Actions.SIGNALS_ACTIVE)],
             [InlineKeyboardButton("📋 Мои сигналы", callback_data="my_signals")],
             [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
-                [InlineKeyboardButton("📡 ИСТОЧНИКИ", callback_data=Actions.DATA_SOURCES_INFO)],
         ])
         
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -1851,7 +1845,6 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
             [InlineKeyboardButton("📈 Когда цена вырастет", callback_data=Actions.ALERTS_ABOVE)],
             [InlineKeyboardButton("📉 Когда цена упадёт", callback_data=Actions.ALERTS_BELOW)],
             [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
-                [InlineKeyboardButton("📡 ИСТОЧНИКИ", callback_data=Actions.DATA_SOURCES_INFO)],
         ])
         
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -1973,7 +1966,6 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
             [InlineKeyboardButton("⭐ STANDARD — $4.99", callback_data=Actions.PAY_STANDARD)],
             [InlineKeyboardButton("💎 PREMIUM — $14.99", callback_data=Actions.PAY_PREMIUM)],
             [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
-                [InlineKeyboardButton("📡 ИСТОЧНИКИ", callback_data=Actions.DATA_SOURCES_INFO)],
         ])
         
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -2034,7 +2026,6 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
             [InlineKeyboardButton(f"🐋 Киты: {whale_status}", callback_data=Actions.SETTINGS_NOTIFY_WHALE)],
             [InlineKeyboardButton(f"💰 Цены: {price_status}", callback_data=Actions.SETTINGS_NOTIFY_PRICE)],
             [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
-                [InlineKeyboardButton("📡 ИСТОЧНИКИ", callback_data=Actions.DATA_SOURCES_INFO)],
         ])
         
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
@@ -2058,6 +2049,7 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
     def _get_admin_keyboard(self) -> InlineKeyboardMarkup:
         return InlineKeyboardMarkup([
             [InlineKeyboardButton("📊 Статистика", callback_data=Actions.ADMIN_STATS)],
+                [InlineKeyboardButton("📡 ИСТОЧНИКИ", callback_data=Actions.DATA_SOURCES_INFO)],
             [InlineKeyboardButton("👥 Пользователи", callback_data=Actions.ADMIN_USERS)],
             [InlineKeyboardButton("📢 Рассылка", callback_data=Actions.ADMIN_BROADCAST)],
             [InlineKeyboardButton("🔙 Выход", callback_data=Actions.MENU_MAIN)]
