@@ -443,7 +443,7 @@ class CryptoIntelligenceAgent:
             f"📈 24ч: {metrics.price_change_24h:+.2f}%",
             f"💵 Капитализация: ${metrics.market_cap/1e9:.1f}B",
             "",
-            "📊 *AI CONFIDENCE: {metrics.ai_confidence:.0f}%*",
+            f"📊 *AI CONFIDENCE: {metrics.ai_confidence:.0f}%*",
             f"{pred_emoji.get(metrics.prediction, '⚪')} *{metrics.prediction}*",
             confidence_label,
             ""
