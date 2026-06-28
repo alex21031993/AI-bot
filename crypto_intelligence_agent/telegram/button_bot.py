@@ -1196,7 +1196,7 @@ class ButtonBot:
             is_subscribed = False
 
         # Force access for testing
-        has_access = is_admin or is_subscribed or True
+        has_access = is_admin or is_subscribed
 
         if has_access:
             text = "🧠 *ADVANCED SYSTEM*\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n👋 Выберите функцию:"
