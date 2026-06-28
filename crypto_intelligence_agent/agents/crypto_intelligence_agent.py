@@ -67,6 +67,15 @@ class CryptoIntelligenceAgent:
     def __init__(self):
         self.coingecko_base = "https://api.coingecko.com/api/v3"
         self.session: Optional[aiohttp.ClientSession] = None
+        # Symbol to CoinGecko ID mapping
+        self.symbol_to_id = {
+            "btc": "bitcoin", "eth": "ethereum", "sol": "solana",
+            "doge": "dogecoin", "shib": "shiba-inu", "pepe": "pepe",
+            "xrp": "ripple", "ada": "cardano", "dot": "polkadot",
+            "avax": "avalanche-2", "matic": "matic-network",
+            "link": "chainlink", "uni": "uniswap", "atom": "cosmos",
+            "ltc": "litecoin", "bch": "bitcoin-cash"
+        }
     
     async def _get_session(self) -> aiohttp.ClientSession:
         if not self.session or self.session.closed:
@@ -77,6 +86,13 @@ class CryptoIntelligenceAgent:
         if self.session:
             await self.session.close()
     
+    def _get_coin_id(self, token: str) -> str:
+        """Конвертируем symbol в coin_id"""
+        token_lower = token.lower()
+        if token_lower in self.symbol_to_id:
+            return self.symbol_to_id[token_lower]
+        return token_lower
+
     async def analyze_coin(self, token_id: str) -> CoinMetrics:
         """
         Полный анализ монеты
@@ -87,8 +103,11 @@ class CryptoIntelligenceAgent:
         try:
             session = await self._get_session()
             
+            # Конвертируем symbol в coin_id если нужно
+            coin_id = self._get_coin_id(token_id)
+            
             # Получаем базовые данные
-            coin_data = await self._fetch_market_data(session, token_id)
+            coin_data = await self._fetch_market_data(session, coin_id)
             if not coin_data:
                 return self._default_metrics(token_id)
             
@@ -100,7 +119,7 @@ class CryptoIntelligenceAgent:
             change_24h = coin_data.get("price_change_percentage_24h", 0) or 0
             
             # Получаем дополнительные данные
-            coin_detail = await self._fetch_coin_detail(session, token_id)
+            coin_detail = await self._fetch_coin_detail(session, coin_id)
             
             # Рассчитываем метрики
             metrics = CoinMetrics(symbol=symbol, name=name, price=price, 
