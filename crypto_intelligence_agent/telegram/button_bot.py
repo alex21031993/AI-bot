@@ -304,6 +304,22 @@ class ButtonBot:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+📡 *ИСТОЧНИКИ ДАННЫХ:*
+
+📊 *Рыночные данные:*
+CoinMarketCap, CoinGecko, DexScreener, TradingView
+
+🐋 *Киты и ончейн:*
+Whale Alert, Arkham Intelligence, Nansen, Etherscan
+
+💬 *Социальные сети:*
+X (Twitter), Telegram, Reddit, Discord
+
+📰 *Новости:*
+CoinDesk, Cointelegraph, CryptoPanic
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 👇 *Выберите действие:*"""
         
         await update.message.reply_text(
