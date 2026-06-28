@@ -74,6 +74,8 @@ class Actions:
     
     # Admin menu
     ADMIN_ENTER = "admin_enter"
+    ADMIN_PASSWORD = "admin_password"
+    ADMIN_VERIFY = "admin_verify"
     ADMIN_MENU = "admin_menu"
     ADMIN_STATS = "admin_stats"
     ADMIN_BROADCAST = "admin_broadcast"
@@ -258,23 +260,16 @@ class ButtonBot:
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-🤖 *Что я умею:*
+🎁 *Бесплатный пробный период активен!*
 
-📊 *АВТОМАТИЧЕСКИ нахожу лучшие монеты*
-   Сканирую рынок каждые 15 минут
-   Анализирую объемы, тренды, китов
+⏰ У Вас осталось: *{max(0, days_left)} дней*
 
-🟢🟡🔴 *Сигналы на покупку/продажу*
-   BUY — покупать
-   HOLD — держать
-   SELL — продавать
-
-🔔 *Уведомления в реальном времени*
-   При сигнале — присылаю оповещение
+💡 В этом боте Вы можете:
+📊 Анализировать монеты
+🔔 Получать сигналы
+🐋 Отслеживать китов
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-{trial_text}
 
 👇 *Выберите действие:*"""
         
@@ -466,7 +461,7 @@ class ButtonBot:
             if user_id in self.admin_ids:
                 if text == self.admin_password:
                     await update.message.reply_text(
-                        "✅ *Пароль верный!*\n\nДобро пожаловать в админ-панель!",
+                        "👑 *Вы вошли как администратор!*\n\nВам доступны все функции без ограничений.",
                         parse_mode="Markdown",
                         reply_markup=self._get_admin_keyboard()
                     )
