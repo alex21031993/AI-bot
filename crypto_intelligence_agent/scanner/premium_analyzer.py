@@ -13,7 +13,6 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 from loguru import logger
-import random
 
 
 @dataclass
@@ -464,39 +463,22 @@ class PremiumScanner:
         
         wallets = []
         
-        # Симулируем данные для 5-8 кошельков
-        num_wallets = random.randint(5, 8)
-        
-        for i in range(num_wallets):
-            if i < len(known_wallets):
-                info = known_wallets[i]
-                address = info["address"]
-                label = info["label"]
-                is_exchange = info["is_exchange"]
-                is_smart = info.get("is_smart", False)
-            else:
-                # Генерируем случайный кошелек
-                address = f"0x{''.join(random.choices('0123456789abcdef', k=40))}"
-                label = f"🐋 Whale #{i+1}"
-                is_exchange = False
-                is_smart = random.random() > 0.7
-            
-            # Симулируем баланс (от 1M до 500M USDT)
-            balance = random.uniform(1e6, 500e6)
-            
-            # Симулируем изменение за 24ч (от -20% до +30%)
-            change_24h = random.uniform(-20, 30)
+                # Используем известные кошельки
+        for info in known_wallets:
+            market_cap_factor = 0.001 if info.get("is_exchange", False) else 0.01
+            balance = market_cap * market_cap_factor if market_cap > 0 else 1e6
+            change_24h = whale_pressure * 5 if whale_pressure != 0 else 0
             
             wallets.append(WhaleWallet(
-                address=address,
-                label=label,
+                address=info["address"],
+                label=info["label"],
                 balance=balance,
                 change_24h=change_24h,
-                is_exchange=is_exchange,
-                is_smart_money=is_smart,
-                transaction_count=random.randint(1, 50)
+                is_exchange=info.get("is_exchange", False),
+                is_smart_money=info.get("is_smart", False),
+                transaction_count=int(balance / 1e7)
             ))
-        
+
         return wallets
     
     def _analyze_whale_pressure(self, wallets: List[WhaleWallet]) -> Tuple[float, float]:
@@ -618,8 +600,8 @@ class PremiumScanner:
             dump_score += 10
         
         # Добавляем немного случайности
-        pump_score += random.uniform(-5, 10)
-        dump_score += random.uniform(-5, 10)
+        pump_score += whale_pressure * 2
+        dump_score -= whale_pressure * 2
         
         # Нормализуем
         pump_prob = max(0, min(95, pump_score))
@@ -702,9 +684,9 @@ class PremiumScanner:
         # Киты более активны на крупных объемах
         whale_ratio = min(0.3, volume / mcap) if mcap > 0 else 0
         
-        transactions = int(random.uniform(5, 50) * whale_ratio * 100)
-        volume_whale = volume * whale_ratio * random.uniform(0.3, 0.7)
-        smart_money = volume_whale * random.uniform(0.2, 0.5)
+        transactions = int((5 + abs(whale_pressure)) * whale_ratio * 10)
+        volume_whale = volume * whale_ratio * 0.5
+        smart_money = volume_whale * 0.3
         
         return transactions, volume_whale, smart_money
     
@@ -713,7 +695,7 @@ class PremiumScanner:
         change = coin.get("price_change_percentage_24h", 0) or 0
         
         # RSI (0-100)
-        rsi = 50 + change * 5 + random.uniform(-10, 10)
+        rsi = 50 + change * 5
         rsi = max(20, min(80, rsi))
         
         # MACD
@@ -787,8 +769,8 @@ class PremiumScanner:
             score_dump += 15
         
         # Случайность для демо
-        score_pump += random.uniform(-10, 15)
-        score_dump += random.uniform(-10, 15)
+        score_pump += price_momentum * 5
+        score_dump -= price_momentum * 5
         
         pump_prob = max(0, min(95, score_pump))
         dump_prob = max(0, min(95, score_dump))
@@ -796,10 +778,10 @@ class PremiumScanner:
         # Определяем прогноз
         if pump_prob > dump_prob + 10:
             prediction = "PUMP"
-            minutes = int(random.uniform(5, 25))
+            minutes = int(abs(price_change_24h) * 10) if price_change_24h != 0 else 15
         elif dump_prob > pump_prob + 10:
             prediction = "DUMP"
-            minutes = int(random.uniform(5, 25))
+            minutes = int(abs(price_change_24h) * 10) if price_change_24h != 0 else 15
         else:
             prediction = "HOLD"
             minutes = 0
