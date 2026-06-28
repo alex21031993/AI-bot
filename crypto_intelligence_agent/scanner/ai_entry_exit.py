@@ -175,17 +175,28 @@ class AIEntryExitScanner:
     async def _fetch_market_data(self, session: aiohttp.ClientSession, token_id: str) -> Optional[Dict]:
         """Получить рыночные данные"""
         try:
-            async with session.get(
-                f"{self.coingecko_base}/coins/markets",
-                params={
-                    "vs_currency": "usd",
-                    "ids": token_id,
-                    "order": "market_cap_desc",
-                    "per_page": 1,
-                    "sparkline": "true",
-                    "price_change_percentage": "1h,24h,7d,30d"
-                }
-            ) as resp:
+            coin_id = self._get_coin_id(token_id)
+            
+            # Retry for rate limiting
+            for attempt in range(3):
+                async with session.get(
+                    f"{self.coingecko_base}/coins/markets",
+                    params={
+                        "vs_currency": "usd",
+                        "ids": coin_id,
+                        "order": "market_cap_desc",
+                        "per_page": 1,
+                        "sparkline": "true",
+                        "price_change_percentage": "1h,24h,7d,30d"
+                    }
+                ) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        return data[0] if data else None
+                    elif resp.status == 429 and attempt < 2:
+                        await asyncio.sleep(2)
+                        continue
+                return None
                 if resp.status == 200:
                     data = await resp.json()
                     return data[0] if data else None

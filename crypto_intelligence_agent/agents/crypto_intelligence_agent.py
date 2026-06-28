@@ -2,6 +2,7 @@
 Crypto Intelligence Agent - AI-агент для криптоанализа
 """
 import asyncio
+import time
 import aiohttp
 from datetime import datetime
 from typing import Dict, List, Optional, Any
@@ -67,6 +68,7 @@ class CryptoIntelligenceAgent:
     def __init__(self):
         self.coingecko_base = "https://api.coingecko.com/api/v3"
         self.session: Optional[aiohttp.ClientSession] = None
+        self._last_request_time = 0  # Rate limiting
         # Symbol to CoinGecko ID mapping
         self.symbol_to_id = {
             "btc": "bitcoin", "eth": "ethereum", "sol": "solana",
@@ -102,6 +104,13 @@ class CryptoIntelligenceAgent:
         """
         try:
             session = await self._get_session()
+            
+            # Rate limiting - wait between requests
+            import time
+            time_since_last = time.time() - self._last_request_time
+            if time_since_last < 1.5:  # At least 1.5 sec between requests
+                await asyncio.sleep(1.5 - time_since_last)
+            self._last_request_time = time.time()
             
             # Конвертируем symbol в coin_id если нужно
             coin_id = self._get_coin_id(token_id)
@@ -164,27 +173,38 @@ class CryptoIntelligenceAgent:
             return self._default_metrics(token_id)
     
     async def _fetch_market_data(self, session: aiohttp.ClientSession, token_id: str) -> Optional[Dict]:
-        """Получить рыночные данные"""
+        """Получить рыночные данные с кэшированием"""
+        # Cache for 60 seconds
+        if not hasattr(self, '_cache'):
+            self._cache = {}
+        
+        cache_key = f"market_{token_id}"
+        if cache_key in self._cache:
+            cached = self._cache[cache_key]
+            if time.time() - cached['time'] < 60:
+                return cached['data']
+        
         try:
-            for attempt in range(3):
-                async with session.get(
-                    f"{self.coingecko_base}/coins/markets",
-                    params={
-                        "vs_currency": "usd",
-                        "ids": token_id,
-                        "order": "market_cap_desc",
-                        "per_page": 1,
-                        "sparkline": "false",
-                        "price_change_percentage": "1h,24h,7d"
-                    },
-                    timeout=aiohttp.ClientTimeout(total=30)
-                ) as resp:
-                    if resp.status == 200:
-                        data = await resp.json()
-                        return data[0] if data else None
-                    elif resp.status == 429:
-                        await asyncio.sleep(2 ** attempt)
-                        continue
+            async with session.get(
+                f"{self.coingecko_base}/coins/markets",
+                params={
+                    "vs_currency": "usd",
+                    "ids": token_id,
+                    "order": "market_cap_desc",
+                    "per_page": 1,
+                    "sparkline": "false",
+                    "price_change_percentage": "1h,24h,7d"
+                },
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as resp:
+                if resp.status == 200:
+                    data = await resp.json()
+                    if data and len(data) > 0:
+                        self._cache[cache_key] = {'data': data[0], 'time': time.time()}
+                        return data[0]
+                elif resp.status == 429:
+                    logger.warning("Rate limited, using cached data")
+                    return self._cache.get(cache_key, {}).get('data')
             return None
         except Exception as e:
             logger.error(f"Fetch market data error: {e}")

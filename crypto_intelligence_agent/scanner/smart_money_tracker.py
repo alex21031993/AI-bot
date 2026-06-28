@@ -200,16 +200,30 @@ class SmartMoneyTracker:
             return self._default_analysis(token_id)
     
     async def _fetch_coin_data(self, session: aiohttp.ClientSession, token_id: str) -> Optional[Dict]:
-        """Получить данные монеты"""
+        """Получить данные монеты с retry"""
         try:
             coin_id = self._get_coin_id(token_id)
-            async with session.get(
-                f"{self.coingecko_base}/coins/markets",
-                params={"vs_currency": "usd", "ids": coin_id, "order": "market_cap_desc", "per_page": 1}
-            ) as resp:
-                if resp.status == 200:
-                    data = await resp.json()
-                    return data[0] if data else None
+            
+            # Retry logic for rate limiting
+            for attempt in range(3):
+                try:
+                    async with session.get(
+                        f"{self.coingecko_base}/coins/markets",
+                        params={"vs_currency": "usd", "ids": coin_id, "order": "market_cap_desc", "per_page": 1}
+                    ) as resp:
+                        if resp.status == 200:
+                            data = await resp.json()
+                            if data and len(data) > 0:
+                                return data[0]
+                        elif resp.status == 429:
+                            await asyncio.sleep(2 * (attempt + 1))
+                            continue
+                        return None
+                except Exception:
+                    if attempt < 2:
+                        await asyncio.sleep(1)
+                        continue
+                    return None
             return None
         except Exception as e:
             logger.error(f"Fetch coin data error: {e}")
