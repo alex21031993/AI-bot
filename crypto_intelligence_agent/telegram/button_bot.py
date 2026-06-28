@@ -580,7 +580,6 @@ class ButtonBot:
             [InlineKeyboardButton("⏱️ АНАЛИЗ ПЕРИОДА", callback_data=Actions.PREMIUM_SIGNAL)],
             [InlineKeyboardButton("🔔 Оповещения", callback_data=Actions.MENU_ALERTS)],
                 [InlineKeyboardButton("🧠 ADVANCED SYSTEM", callback_data=Actions.ADVANCED_SYSTEM)],
-            [InlineKeyboardButton(f"⏰ {days_remaining} дней осталось", callback_data="noop")],
             [InlineKeyboardButton("👑 Админ", callback_data=Actions.ADMIN_ENTER)]
         ])
     
