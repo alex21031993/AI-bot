@@ -55,6 +55,22 @@ class EarlyPumpDetector:
     - Технические сигналы
     """
     
+    # Symbol to CoinGecko ID mapping
+    SYMBOL_TO_ID = {
+        "btc": "bitcoin", "eth": "ethereum", "sol": "solana",
+        "doge": "dogecoin", "shib": "shiba-inu", "pepe": "pepe",
+        "xrp": "ripple", "ada": "cardano", "dot": "polkadot",
+        "avax": "avalanche-2", "matic": "matic-network",
+        "link": "chainlink", "uni": "uniswap", "atom": "cosmos",
+        "ltc": "litecoin", "bch": "bitcoin-cash", "near": "near",
+        "aave": "aave", "sui": "sui", "pump": "pump"
+    }
+    
+    def _get_coin_id(self, token: str) -> str:
+        """Конвертируем symbol в coin_id"""
+        token_lower = token.lower()
+        return self.SYMBOL_TO_ID.get(token_lower, token_lower)
+
     def __init__(self):
         self.coingecko_base = "https://api.coingecko.com/api/v3"
         self.session: Optional[aiohttp.ClientSession] = None

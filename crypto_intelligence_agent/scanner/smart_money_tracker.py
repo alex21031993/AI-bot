@@ -49,6 +49,85 @@ class SmartMoneyAnalysis:
             self.top_wallets = []
         if self.signals is None:
             self.signals = []
+    
+    def get(self, key, default=None):
+        """Dict-like access"""
+        return getattr(self, key, default) if hasattr(self, key) else default
+
+
+
+    def _calculate_buy_pressure(self, change_24h: float, volume: float, mcap: float) -> float:
+        """Рассчитать давление покупок"""
+        pressure = change_24h * 10  # Base from price change
+        
+        # Volume factor
+        if mcap > 0 and volume / mcap > 0.1:
+            pressure += 20
+        
+        return max(-100, min(100, pressure))
+    
+    def _estimate_whale_count(self, mcap: float) -> int:
+        """Оценить количество китов"""
+        if mcap > 10_000_000_000: return 15
+        elif mcap > 1_000_000_000: return 10
+        elif mcap > 100_000_000: return 5
+        return 3
+    
+    def _generate_signals(self, buy_pressure: float, change_24h: float, volume: float, mcap: float) -> List[str]:
+        """Генерировать сигналы"""
+        signals = []
+        
+        if buy_pressure > 30:
+            signals.append("🟢 Сильное давление покупок")
+        elif buy_pressure > 10:
+            signals.append("🟡 Умеренное давление покупок")
+        elif buy_pressure < -30:
+            signals.append("🔴 Давление продаж")
+        
+        if abs(change_24h) > 10:
+            signals.append("⚠️ Высокая волатильность")
+        
+        if mcap > 0 and volume / mcap > 0.15:
+            signals.append("💰 Аномально высокий объем")
+        
+        if not signals:
+            signals.append("⚪ Нейтральная активность")
+        
+        return signals
+    
+    def _generate_sample_wallets(self, coin_data: Dict) -> List[SmartMoneyWallet]:
+        """Генерировать примеры кошельков"""
+        wallets = []
+        mcap = coin_data.get("market_cap", 0) or 0
+        
+        # Генерируем 3 кошелька с разными балансами
+        total_balance = mcap * 0.15
+        wallets.append(SmartMoneyWallet(
+            address="0x1234...5678",
+            label="💎 Smart Money Alpha",
+            balance_usd=total_balance * 0.5,
+            change_24h_percent=5.2,
+            tokens_held=1,
+            is_smart_money=True
+        ))
+        wallets.append(SmartMoneyWallet(
+            address="0xabcd...ef01",
+            label="🐋 Whale Fund",
+            balance_usd=total_balance * 0.3,
+            change_24h_percent=-2.1,
+            tokens_held=1,
+            is_smart_money=True
+        ))
+        wallets.append(SmartMoneyWallet(
+            address="0x9876...5432",
+            label="📈 Institutional",
+            balance_usd=total_balance * 0.2,
+            change_24h_percent=8.5,
+            tokens_held=1,
+            is_exchange=False
+        ))
+        
+        return wallets
 
 
 class SmartMoneyTracker:
@@ -69,6 +148,22 @@ class SmartMoneyTracker:
         "0x56eddb7aa87536c09ccc2793473599fd21a8b17f",  # Binance ETH
     }
     
+    # Symbol to CoinGecko ID mapping
+    SYMBOL_TO_ID = {
+        "btc": "bitcoin", "eth": "ethereum", "sol": "solana",
+        "doge": "dogecoin", "shib": "shiba-inu", "pepe": "pepe",
+        "xrp": "ripple", "ada": "cardano", "dot": "polkadot",
+        "avax": "avalanche-2", "matic": "matic-network",
+        "link": "chainlink", "uni": "uniswap", "atom": "cosmos",
+        "ltc": "litecoin", "bch": "bitcoin-cash", "near": "near",
+        "aave": "aave", "sui": "sui", "pump": "pump"
+    }
+    
+    def _get_coin_id(self, token: str) -> str:
+        """Конвертируем symbol в coin_id"""
+        token_lower = token.lower()
+        return self.SYMBOL_TO_ID.get(token_lower, token_lower)
+
     def __init__(self):
         self.coingecko_base = "https://api.coingecko.com/api/v3"
         self.session: Optional[aiohttp.ClientSession] = None
@@ -107,9 +202,10 @@ class SmartMoneyTracker:
     async def _fetch_coin_data(self, session: aiohttp.ClientSession, token_id: str) -> Optional[Dict]:
         """Получить данные монеты"""
         try:
+            coin_id = self._get_coin_id(token_id)
             async with session.get(
                 f"{self.coingecko_base}/coins/markets",
-                params={"vs_currency": "usd", "ids": token_id, "order": "market_cap_desc", "per_page": 1}
+                params={"vs_currency": "usd", "ids": coin_id, "order": "market_cap_desc", "per_page": 1}
             ) as resp:
                 if resp.status == 200:
                     data = await resp.json()
