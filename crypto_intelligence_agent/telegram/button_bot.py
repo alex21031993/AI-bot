@@ -109,6 +109,8 @@ class Actions:
     
     # Premium deep analysis
     PREMIUM_DEEP = "premium_deep"
+    ADVANCED_SYSTEM = "advanced_system"
+    PAY_ADVANCED_SYSTEM = "pay_advanced_system"
     PAY_PREMIUM_USES = "pay_premium_uses"
     
     # Admin panel (for when admin is already authenticated)
@@ -354,6 +356,12 @@ class ButtonBot:
         elif data == Actions.PREMIUM_DEEP:
             await self._show_premium_deep(query)
 
+        elif data == Actions.ADVANCED_SYSTEM:
+            await self._show_advanced_system(query)
+        
+        elif data == Actions.PAY_ADVANCED_SYSTEM:
+            await self._show_advanced_payment(query)
+
         elif data == Actions.PAY_PREMIUM_USES:
             await self._show_premium_uses_payment(query)
         
@@ -550,7 +558,9 @@ class ButtonBot:
                 [InlineKeyboardButton("💎 PREMIUM АНАЛИЗ", callback_data=Actions.PREMIUM_DEEP)],
                 [InlineKeyboardButton("⏱️ АНАЛИЗ ПЕРИОДА", callback_data=Actions.PREMIUM_SIGNAL)],
                 [InlineKeyboardButton("🔔 Оповещения", callback_data=Actions.MENU_ALERTS)],
+                [InlineKeyboardButton("🧠 ADVANCED SYSTEM", callback_data=Actions.ADVANCED_SYSTEM)],
                 [InlineKeyboardButton("👑 АДМИН-ПАНЕЛЬ", callback_data=Actions.ADMIN_PANEL)],
+                [InlineKeyboardButton("🧠 ADVANCED SYSTEM", callback_data=Actions.ADVANCED_SYSTEM)],
                 [InlineKeyboardButton("🔙 Назад", callback_data=Actions.MENU_MAIN)]
             ])
         
@@ -569,6 +579,7 @@ class ButtonBot:
             [InlineKeyboardButton("💎 PREMIUM АНАЛИЗ", callback_data=Actions.PREMIUM_DEEP)],
             [InlineKeyboardButton("⏱️ АНАЛИЗ ПЕРИОДА", callback_data=Actions.PREMIUM_SIGNAL)],
             [InlineKeyboardButton("🔔 Оповещения", callback_data=Actions.MENU_ALERTS)],
+                [InlineKeyboardButton("🧠 ADVANCED SYSTEM", callback_data=Actions.ADVANCED_SYSTEM)],
             [InlineKeyboardButton(f"⏰ {days_remaining} дней осталось", callback_data="noop")],
             [InlineKeyboardButton("👑 Админ", callback_data=Actions.ADMIN_ENTER)]
         ])
@@ -1012,6 +1023,131 @@ class ButtonBot:
 📝 После оплаты напишите свой Telegram ID: `{user_id}`
 
 💡 Или отправьте скриншот оплаты администратору
+"""
+        
+        keyboard = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🔄 ПРОВЕРИТЬ ОПЛАТУ", callback_data=Actions.PAY_CHECK)],
+            [InlineKeyboardButton("🔙 Отмена", callback_data=Actions.MENU_MAIN)]
+        ])
+        
+        await query.edit_message_text(
+            text.format(user_id=user_id),
+            parse_mode="Markdown",
+            reply_markup=keyboard
+        )
+    
+    async def _show_advanced_system(self, query):
+        """Показать Advanced System (премиум)"""
+        user_id = query.from_user.id
+        
+        # Admin has unlimited access
+        is_admin = user_id in self.admin_ids
+        
+        # Check subscription
+        user = await self.db.get_user(user_id)
+        is_subscribed = user and user.subscription_expires and user.subscription_expires > datetime.utcnow()
+        
+        # Check if user has advanced system access
+        has_access = is_admin or is_subscribed
+        
+        if has_access:
+            # Show Advanced System menu
+            text = """🧠 *ADVANCED SYSTEM*
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+👋 Добро пожаловать в Advanced System!
+
+Выберите функцию для анализа:
+
+🔍 AI-анализ токенов
+👤 Smart Money Tracker
+📊 PRO-отчёты
+📈 Early Pump Detector
+🛡️ Rug Pull Detector
+🐋 Анализ китов
+🔄 Meme Coin Scanner
+🧠 AI Confidence Engine
+📉 AI Entry & Exit
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+💎 У вас полный доступ (PREMIUM)
+"""
+            
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔍 AI-анализ токенов", callback_data=Actions.SCAN_BUY_SIGNALS)],
+                [InlineKeyboardButton("🐋 Smart Money Tracker", callback_data=Actions.SCAN_TOP_10)],
+                [InlineKeyboardButton("📊 PRO-отчёты", callback_data=Actions.SCAN_SIGNALS)],
+                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+            ])
+            
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+        else:
+            # Show payment request
+            text = """🔒 *ДОСТУП К ADVANCED SYSTEM ОГРАНИЧЕН*
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+🧠 Advanced System — это премиум-функция, доступная только
+для подписчиков.
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 *ВОЗМОЖНОСТИ ADVANCED SYSTEM:*
+🔍 AI-анализ токенов
+👤 Smart Money Tracker
+📊 PRO-отчёты
+📈 Early Pump Detector
+🛡️ Rug Pull Detector
+🐋 Анализ китов
+🔄 Meme Coin Scanner
+🧠 AI Confidence Engine
+📉 AI Entry & Exit
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+💰 *СТОИМОСТЬ:* 15 USDT/месяц
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+"""
+            
+            keyboard = InlineKeyboardMarkup([
+                [InlineKeyboardButton("💳 ОПЛАТИТЬ 15 USDT/месяц", callback_data=Actions.PAY_ADVANCED_SYSTEM)],
+                [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
+            ])
+            
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
+    
+    async def _show_advanced_payment(self, query):
+        """Показать форму оплаты Advanced System"""
+        user_id = query.from_user.id
+        
+        text = """💳 *ОПЛАТА ADVANCED SYSTEM*
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+💰 Сумма: *15 USDT* (TRC20)
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+📬 *АДРЕС ДЛЯ ОПЛАТЫ:*
+`TCSYEiTBp67GvUk3f2f1foL1jdRKu6upD8`
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+📋 *ИНСТРУКЦИЯ:*
+1. Откройте кошелёк (Trust Wallet, MetaMask, биржа)
+2. Отправьте 15 USDT на адрес выше
+3. Дождитесь подтверждения (1-3 минуты)
+4. Доступ откроется автоматически
+
+⚠️ *ВНИМАНИЕ:*
+• Отправляйте ТОЛЬКО USDT (TRC20)
+• Не отправляйте другую криптовалюту
+
+━━━━━━━━━━━━━━━━━━━━━━━━
+
+📝 Ваш Telegram ID: `{user_id}`
+💡 Отправьте скриншот оплаты администратору
+
+━━━━━━━━━━━━━━━━━━━━━━━━
 """
         
         keyboard = InlineKeyboardMarkup([
