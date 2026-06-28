@@ -534,7 +534,7 @@ class ButtonBot:
                     await update.message.reply_text(
                         admin_welcome,
                         parse_mode="Markdown",
-                        reply_markup=self._get_admin_keyboard()
+                        reply_markup=self._get_full_admin_menu_keyboard()
                     )
                     self.user_states[user_id] = Actions.ADMIN_MENU
                 else:
