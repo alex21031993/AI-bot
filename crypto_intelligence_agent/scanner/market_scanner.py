@@ -117,7 +117,7 @@ class MarketScanner:
         if self.session and not self.session.closed:
             await self.session.close()
     
-    async def scan_market(self, limit: int = 100) -> List[CoinAnalysis]:
+    async def scan_market(self, limit: int = 500) -> List[CoinAnalysis]:
         """Полное сканирование рынка (без стейблкоинов)"""
         logger.info(f"Starting market scan (limit={limit})...")
         
@@ -150,7 +150,7 @@ class MarketScanner:
             logger.info(f"Filtered {len(coins_data) - len(filtered_coins)} stablecoins, analyzing {len(filtered_coins)} coins")
             
             # Анализируем каждую монету
-            tasks = [self._analyze_coin(session, coin) for coin in filtered_coins[:50]]
+            tasks = [self._analyze_coin(session, coin) for coin in filtered_coins]
             results = await asyncio.gather(*tasks, return_exceptions=True)
             
             analyses = [r for r in results if isinstance(r, CoinAnalysis)]
