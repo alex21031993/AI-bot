@@ -126,6 +126,8 @@ class Actions:
     
     # Admin panel (for when admin is already authenticated)
     ADMIN_PANEL = "admin_panel"
+    DATA_SOURCES_INFO = "data_sources_info"
+    DATA_SOURCES = "data_sources"
 
 
 class ButtonBot:
