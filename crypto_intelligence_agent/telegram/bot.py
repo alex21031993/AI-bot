@@ -27,7 +27,7 @@ class BotConfig:
     """Bot configuration"""
     token: str
     admin_ids: List[int] = None
-    demo_mode: bool = True
+    demo_mode: bool = False
     
     def __post_init__(self):
         if self.admin_ids is None:

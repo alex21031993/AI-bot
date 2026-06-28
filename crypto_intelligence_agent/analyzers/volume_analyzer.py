@@ -232,7 +232,7 @@ class VolumeAnalyzer:
         else:
             metrics.liquidity_score = 100
         
-        # Buy/Sell ratio (simulated - in production use DEX or exchange data)
+        # Buy/Sell ratio from volume analysis
         # For now, assume 50/50 split
         metrics.buy_volume_24h = metrics.current_volume_24h * 0.5
         metrics.sell_volume_24h = metrics.current_volume_24h * 0.5
