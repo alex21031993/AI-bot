@@ -1220,6 +1220,7 @@ class ButtonBot:
                 [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_BACK)]
             ])
             
+            await query.answer("Загружаю...")
             await query.edit_message_text(text, parse_mode="Markdown", reply_markup=keyboard)
         else:
             # Show payment request
