@@ -489,6 +489,10 @@ class ButtonBot:
             await self._request_broadcast_message(query)
         
         elif data == Actions.ADMIN_USERS:
+            await self._show_data_sources_info(query)
+
+        elif data == Actions.DATA_SOURCES_INFO:
+            await self._show_data_sources_info(query)
             await self._show_admin_users(query)
     
     # ============ TEXT INPUT HANDLER ============
