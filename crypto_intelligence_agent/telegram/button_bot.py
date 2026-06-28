@@ -11,6 +11,7 @@ from crypto_intelligence_agent.data_sources import DataSourcesInfo
 from typing import Dict, Optional
 
 from crypto_intelligence_agent.data_sources import DataSourcesInfo
+from telegram.error import BadRequest
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from crypto_intelligence_agent.data_sources import DataSourcesInfo
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, ContextTypes, filters
@@ -687,19 +688,11 @@ class ButtonBot:
 
 👇 *Выберите план подписки:*
 """
-            await query.edit_message_text(
-                text,
-                parse_mode="Markdown",
-                reply_markup=self._get_main_menu_keyboard(user_trial_active=False, is_admin=False)
-            )
+            await self._safe_edit_message(query, text, parse_mode="Markdown", reply_markup=self._get_main_menu_keyboard(user_trial_active=False, is_admin=False))
             return
         
         # Show full menu with days remaining
-        await query.edit_message_text(
-            self._get_main_menu_text(),
-            parse_mode="Markdown",
-            reply_markup=self._get_main_menu_keyboard(user_trial_active=True, is_admin=is_admin, days_remaining=days_remaining)
-        )
+        await self._safe_edit_message(query, self._get_main_menu_text(), parse_mode="Markdown", reply_markup=self._get_main_menu_keyboard(user_trial_active=True, is_admin=is_admin, days_remaining=days_remaining))
     
     # ============ SCANNER METHODS ============
     
@@ -2068,6 +2061,20 @@ TxID: `{tx.get('tx_id', '')[:20]}...`
             [InlineKeyboardButton("📢 Рассылка", callback_data=Actions.ADMIN_BROADCAST)],
             [InlineKeyboardButton("🔙 Главное меню", callback_data=Actions.MENU_MAIN)]
         ])
+
+
+    async def _safe_edit_message(self, query, text, parse_mode=None, reply_markup=None):
+        """Безопасно редактирует сообщение, игнорируя BadRequest"""
+        try:
+            await query.edit_message_text(
+                text,
+                parse_mode=parse_mode,
+                reply_markup=reply_markup
+            )
+        except BadRequest:
+            pass  # Message not modified - ignore
+        except Exception:
+            pass
 
     def _get_admin_keyboard(self) -> InlineKeyboardMarkup:
         return InlineKeyboardMarkup([
